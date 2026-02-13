@@ -1,7 +1,6 @@
 # PyEPICS
 
 [![CI](https://github.com/melekderman/PyEPICS/actions/workflows/ci.yml/badge.svg)](https://github.com/melekderman/PyEPICS/actions/workflows/ci.yml)
-[![Documentation](https://github.com/melekderman/PyEPICS/actions/workflows/docs.yml/badge.svg)](https://github.com/melekderman/PyEPICS/actions/workflows/docs.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
 [![ReadTheDocs](https://readthedocs.org/projects/pyepics/badge/?version=latest)](https://pyepics.readthedocs.io/en/latest/)
@@ -242,5 +241,4 @@ from pyepics.pyeedl_compat import PERIODIC_TABLE, float_endf, SUBSHELL_LABELS
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
-An open-source tool that converts EPICS datasets (EEDL, EADL, and EPDL) into structured HDF5 files, making evaluated electron-photon coupled physics data easy to use in Python-based simulations, analysis, and modern scientific workflows.
+Please see [LICENSE](LICENSE) for details.
