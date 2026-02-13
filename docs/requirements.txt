@@ -1,0 +1,6 @@
+numpy
+h5py
+endf
+sphinx
+sphinx-rtd-theme
+myst-parser
