@@ -255,7 +255,6 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     _create_xs_dataset(ion_grp, "xs", xs_ion_total, "barns")
     subs_grp = ion_grp.create_group("subshells")
 
-    subshell_mts = set(SUBSHELL_LABELS.keys())
     for mt, shell_label in SUBSHELL_LABELS.items():
         xs_key = f"xs_{shell_label}"
         spec_key = f"spec_{shell_label}"

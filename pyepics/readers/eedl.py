@@ -50,7 +50,7 @@ except ImportError as _exc:  # pragma: no cover
         "Install it with: pip install endf"
     ) from _exc
 
-from pyepics.exceptions import FileFormatError, ParseError
+from pyepics.exceptions import FileFormatError
 from pyepics.models.records import (
     AverageEnergyLoss,
     CrossSectionRecord,

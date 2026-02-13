@@ -41,7 +41,6 @@ pyepics.converters.hdf5      : high-level convenience API
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import numpy as np
 
@@ -52,7 +51,6 @@ except ImportError as _exc:
         "The 'h5py' package is required.  Install with: pip install h5py"
     ) from _exc
 
-from pyepics.exceptions import ConversionError
 from pyepics.models.records import (
     EADLDataset,
     EEDLDataset,
