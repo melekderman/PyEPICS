@@ -709,3 +709,86 @@ def create_mcdc_hdf5(
         raise ConversionError(f"Failed to write MCDC HDF5 {out}: {exc}") from exc
 
     logger.info("Wrote MCDC %s HDF5: %s", dataset_type, out)
+
+
+def create_combined_mcdc_hdf5(
+    Z: int,
+    output_path: Path | str,
+    *,
+    eedl_path: Path | str | None = None,
+    epdl_path: Path | str | None = None,
+    eadl_path: Path | str | None = None,
+    validate: bool = True,
+    overwrite: bool = False,
+) -> None:
+    """Create a **single** MCDC HDF5 file containing electron, photon, and atomic data.
+
+    Each element gets one file (e.g. ``Fe.h5``) with up to three
+    top-level groups: ``electron_reactions``, ``photon_reactions``,
+    and ``atomic_relaxation``.
+
+    Parameters
+    ----------
+    Z : int
+        Atomic number (used for logging only; actual Z comes from the
+        parsed data).
+    output_path : Path | str
+        Path for the combined output HDF5 file.
+    eedl_path : Path | str | None
+        Path to the EEDL ENDF source file (electron).
+    epdl_path : Path | str | None
+        Path to the EPDL ENDF source file (photon).
+    eadl_path : Path | str | None
+        Path to the EADL ENDF source file (atomic relaxation).
+    validate : bool, optional
+        Post-parse validation.  Default ``True``.
+    overwrite : bool, optional
+        Overwrite existing file.  Default ``False``.
+
+    Examples
+    --------
+    >>> create_combined_mcdc_hdf5(
+    ...     26, "data/mcdc/Fe.h5",
+    ...     eedl_path="data/endf/eedl/EEDL.ZA026000.endf",
+    ...     epdl_path="data/endf/epdl/EPDL.ZA026000.endf",
+    ...     eadl_path="data/endf/eadl/EADL.ZA026000.endf",
+    ... )
+    """
+    from pyepics.converters.mcdc_hdf5 import write_mcdc_combined
+
+    from pyepics.readers.eadl import EADLReader
+    from pyepics.readers.eedl import EEDLReader
+    from pyepics.readers.epdl import EPDLReader
+
+    out = Path(output_path)
+    if out.exists() and not overwrite:
+        raise ConversionError(f"Output file {out} already exists and overwrite=False.")
+
+    eedl_ds = EEDLReader().read(Path(eedl_path), validate=validate) if eedl_path else None
+    epdl_ds = EPDLReader().read(Path(epdl_path), validate=validate) if epdl_path else None
+    eadl_ds = EADLReader().read(Path(eadl_path), validate=validate) if eadl_path else None
+
+    if not any([eedl_ds, epdl_ds, eadl_ds]):
+        raise ConversionError(
+            f"No ENDF source files found for Z={Z}. "
+            "At least one of eedl_path, epdl_path, eadl_path must be provided."
+        )
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = "w" if overwrite else "w-"
+        with h5py.File(str(out), mode) as h5f:
+            write_mcdc_combined(h5f, eedl=eedl_ds, epdl=epdl_ds, eadl=eadl_ds)
+    except Exception as exc:
+        if isinstance(exc, ConversionError):
+            raise
+        raise ConversionError(f"Failed to write combined MCDC HDF5 {out}: {exc}") from exc
+
+    libs = []
+    if eedl_ds:
+        libs.append("EEDL")
+    if epdl_ds:
+        libs.append("EPDL")
+    if eadl_ds:
+        libs.append("EADL")
+    logger.info("Wrote combined MCDC HDF5 (%s): %s", "+".join(libs), out)

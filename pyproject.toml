@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyepics-data"
-version = "0.1.0"
+name = "epics"
+version = "1.0.0"
 description = "Python library for reading and converting EPICS (Electron Photon Interaction Cross Sections) nuclear data"
 readme = "README.md"
 license = {text = "BSD-3-Clause"}
@@ -44,10 +44,10 @@ plot = [
     "matplotlib>=3.7",
 ]
 all = [
-    "pyepics-data[download,pandas,plot]",
+    "epics[download,pandas,plot]",
 ]
 dev = [
-    "pyepics-data[all]",
+    "epics[all]",
     "pytest>=7.0",
     "ruff>=0.4",
     "sphinx>=7.0",
@@ -62,7 +62,7 @@ Repository = "https://github.com/melekderman/PyEPICS"
 Issues = "https://github.com/melekderman/PyEPICS/issues"
 
 [project.scripts]
-pyepics = "pyepics.cli:main"
+epics = "pyepics.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["pyepics*"]

@@ -48,12 +48,13 @@ Examples
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __author__ = "Melek Derman"
 
 from pyepics.client import ElementProperties, EPICSClient
 from pyepics.converters.hdf5 import (
     convert_dataset_to_hdf5,
+    create_combined_mcdc_hdf5,
     create_mcdc_hdf5,
     create_raw_hdf5,
 )
@@ -83,6 +84,7 @@ __all__ = [
     "convert_dataset_to_hdf5",
     "create_raw_hdf5",
     "create_mcdc_hdf5",
+    "create_combined_mcdc_hdf5",
     # Exceptions
     "PyEPICSError",
     "ParseError",

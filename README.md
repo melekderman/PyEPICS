@@ -5,7 +5,7 @@
 [![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
 [![ReadTheDocs](https://readthedocs.org/projects/pyepics/badge/?version=latest)](https://pyepics.readthedocs.io/en/latest/)
 
-> Python library for reading and converting EPICS (Electron Photon Interaction Cross Sections) nuclear data.
+> Python library for reading and converting EPICS (Electron Photon Interaction Cross Sections) nuclear data by LLNL.
 
 PyEPICS parses EEDL, EPDL, and EADL files from the [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) database (in ENDF-6 format) and converts them into structured HDF5 files suitable for Monte Carlo transport codes such as [MC/DC](https://github.com/CEMeNT-PSAAP/MCDC).
 
@@ -87,10 +87,10 @@ utils ← models ← readers ← converters (raw_hdf5 / mcdc_hdf5)
 
 ```bash
 # From PyPI (when published)
-pip install pyepics-data
+pip install epics
 
 # With all optional dependencies
-pip install "pyepics-data[all]"
+pip install "epics[all]"
 
 # From source (editable, for development)
 git clone https://github.com/melekderman/PyEPICS.git

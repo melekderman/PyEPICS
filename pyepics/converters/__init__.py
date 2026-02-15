@@ -16,14 +16,23 @@ Provides three conversion APIs:
     Writes a "raw" HDF5 preserving original grids and breakpoints.
 * :func:`~pyepics.converters.hdf5.create_mcdc_hdf5`
     Writes an MCDC-optimised HDF5 with common energy grid and PDFs.
+* :func:`~pyepics.converters.hdf5.create_combined_mcdc_hdf5`
+    Creates a single MCDC HDF5 per element with electron, photon,
+    and atomic data combined.
 """
 
 from __future__ import annotations
 
 from pyepics.converters.hdf5 import (
     convert_dataset_to_hdf5,
+    create_combined_mcdc_hdf5,
     create_mcdc_hdf5,
     create_raw_hdf5,
 )
 
-__all__ = ["convert_dataset_to_hdf5", "create_raw_hdf5", "create_mcdc_hdf5"]
+__all__ = [
+    "convert_dataset_to_hdf5",
+    "create_raw_hdf5",
+    "create_mcdc_hdf5",
+    "create_combined_mcdc_hdf5",
+]

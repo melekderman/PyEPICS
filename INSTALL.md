@@ -7,7 +7,7 @@ PyEPICS requires **Python 3.11 or later** (3.11, 3.12, 3.13).
 ## Quick Install from PyPI
 
 ```bash
-pip install pyepics-data
+pip install epics
 ```
 
 This installs the core package with the minimum required dependencies
@@ -19,23 +19,23 @@ PyEPICS defines optional dependency groups you can install as needed:
 
 | Extra      | What it adds                        | Install command                          |
 |------------|-------------------------------------|------------------------------------------|
-| `download` | `requests`, `beautifulsoup4`        | `pip install "pyepics-data[download]"`   |
-| `pandas`   | `pandas`                            | `pip install "pyepics-data[pandas]"`     |
-| `plot`     | `matplotlib`                        | `pip install "pyepics-data[plot]"`       |
-| `all`      | All optional dependencies           | `pip install "pyepics-data[all]"`        |
-| `dev`      | Testing + linting + docs tooling    | `pip install "pyepics-data[dev]"`        |
+| `download` | `requests`, `beautifulsoup4`        | `pip install "epics[download]"`   |
+| `pandas`   | `pandas`                            | `pip install "epics[pandas]"`     |
+| `plot`     | `matplotlib`                        | `pip install "epics[plot]"`       |
+| `all`      | All optional dependencies           | `pip install "epics[all]"`        |
+| `dev`      | Testing + linting + docs tooling    | `pip install "epics[dev]"`        |
 
 ### Examples
 
 ```bash
 # Core only (reading ENDF files and converting to HDF5)
-pip install pyepics-data
+pip install epics
 
 # With plotting and pandas for interactive exploration
-pip install "pyepics-data[plot,pandas]"
+pip install "epics[plot,pandas]"
 
 # Everything (including download support)
-pip install "pyepics-data[all]"
+pip install "epics[all]"
 ```
 
 ## Developer Install
@@ -99,8 +99,8 @@ This produces:
 
 ```
 dist/
-├── pyepics_data-0.1.0.tar.gz      # sdist
-└── pyepics_data-0.1.0-py3-none-any.whl  # wheel
+├── epics-0.1.0.tar.gz      # sdist
+└── epics-0.1.0-py3-none-any.whl  # wheel
 ```
 
 ## Verifying the Install
@@ -125,5 +125,5 @@ print("EPICSClient loaded successfully")
 
   ```bash
   conda install numpy h5py
-  pip install pyepics-data
+  pip install epics
   ```

@@ -43,9 +43,9 @@ Directory structure after a full run::
             photon/         ← raw HDF5 (photon)
             atomic/         ← raw HDF5 (atomic)
         mcdc/
-            electron/       ← MCDC HDF5 (electron)
-            photon/         ← MCDC HDF5 (photon)
-            atomic/         ← MCDC HDF5 (atomic)
+            H.h5            ← combined MCDC (electron + photon + atomic)
+            He.h5
+            ...
 """
 
 from __future__ import annotations
@@ -189,52 +189,74 @@ def cmd_raw(args):
 
 
 def cmd_mcdc(args):
-    """Create MCDC-format HDF5 files from ENDF sources."""
-    from pyepics.converters.hdf5 import create_mcdc_hdf5
+    """Create combined MCDC-format HDF5 files (one per element).
+
+    Each output file contains ``electron_reactions``,
+    ``photon_reactions``, and ``atomic_relaxation`` groups — whichever
+    ENDF sources are available for that element.
+    """
+    from pyepics.converters.hdf5 import create_combined_mcdc_hdf5
 
     base = Path(args.data_dir)
-    libraries = args.libraries or list(LIBRARY_CONFIG.keys())
     z_min, z_max = args.z_min, args.z_max
+
+    mcdc_dir = base / "data/mcdc"
+    mcdc_dir.mkdir(parents=True, exist_ok=True)
+
+    # ENDF directories
+    eedl_dir = base / LIBRARY_CONFIG["electron"]["endf_dir"]
+    epdl_dir = base / LIBRARY_CONFIG["photon"]["endf_dir"]
+    eadl_dir = base / LIBRARY_CONFIG["atomic"]["endf_dir"]
+
+    print(f"\n{'=' * 60}")
+    print(f"  Creating combined MCDC HDF5 files")
+    print(f"  Output:  {mcdc_dir}")
+    print(f"  Z range: {z_min}–{z_max}")
+    print(f"{'=' * 60}")
 
     total_ok = 0
     total_fail = 0
 
-    for lib_name in libraries:
-        cfg = LIBRARY_CONFIG[lib_name]
-        endf_dir = base / cfg["endf_dir"]
-        mcdc_dir = base / cfg["mcdc_dir"]
-        mcdc_dir.mkdir(parents=True, exist_ok=True)
+    for Z in range(z_min, z_max + 1):
+        sym = _element_symbol(Z)
+        eedl_file = _find_endf_file(eedl_dir, "EEDL", Z)
+        epdl_file = _find_endf_file(epdl_dir, "EPDL", Z)
+        eadl_file = _find_endf_file(eadl_dir, "EADL", Z)
 
-        print(f"\n{'=' * 60}")
-        print(f"  Creating MCDC HDF5: {lib_name} ({cfg['dataset_type']})")
-        print(f"  ENDF source:  {endf_dir}")
-        print(f"  Output:       {mcdc_dir}")
-        print(f"  Z range:      {z_min}–{z_max}")
-        print(f"{'=' * 60}")
+        if not any([eedl_file, epdl_file, eadl_file]):
+            continue
 
-        for Z in range(z_min, z_max + 1):
-            sym = _element_symbol(Z)
-            endf_file = _find_endf_file(endf_dir, cfg["endf_prefix"], Z)
-            if endf_file is None:
-                continue
+        libs = []
+        if eedl_file:
+            libs.append("EEDL")
+        if epdl_file:
+            libs.append("EPDL")
+        if eadl_file:
+            libs.append("EADL")
 
-            out_path = mcdc_dir / f"{sym}.h5"
-            print(f"  Z={Z:3d} ({sym:>2s}): {endf_file.name} -> {out_path.name}", end=" ... ", flush=True)
+        out_path = mcdc_dir / f"{sym}.h5"
+        print(
+            f"  Z={Z:3d} ({sym:>2s}): {'+'.join(libs)} -> {out_path.name}",
+            end=" ... ",
+            flush=True,
+        )
 
-            try:
-                create_mcdc_hdf5(
-                    cfg["dataset_type"],
-                    endf_file,
-                    out_path,
-                    overwrite=args.overwrite,
-                )
-                print("OK")
-                total_ok += 1
-            except Exception as exc:
-                print(f"FAIL: {exc}")
-                total_fail += 1
-                if not args.continue_on_error:
-                    return 1
+        try:
+            create_combined_mcdc_hdf5(
+                Z,
+                out_path,
+                eedl_path=eedl_file,
+                epdl_path=epdl_file,
+                eadl_path=eadl_file,
+                overwrite=args.overwrite,
+            )
+            print("OK")
+            total_ok += 1
+        except Exception as exc:
+            print(f"FAIL: {exc}")
+            total_fail += 1
+            if not args.continue_on_error:
+                return 1
 
     print(f"\nMCDC HDF5: {total_ok} OK, {total_fail} failed")
     return 0 if total_fail == 0 else 1
