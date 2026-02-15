@@ -4,21 +4,21 @@ Getting Started
 Installation
 ------------
 
-From PyPI (when published):
+From PyPI:
 
 .. code-block:: bash
 
-   pip install pyepics-data
+   pip install epics
 
 With optional extras:
 
 .. code-block:: bash
 
    # Plotting and pandas support
-   pip install "pyepics-data[plot,pandas]"
+   pip install "epics[plot,pandas]"
 
    # All optional dependencies
-   pip install "pyepics-data[all]"
+   pip install "epics[all]"
 
 From source (development):
 

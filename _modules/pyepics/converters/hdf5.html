@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>pyepics.converters.hdf5 &mdash; PyEPICS 0.1.0 documentation</title>
+  <title>pyepics.converters.hdf5 &mdash; PyEPICS 1.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/documentation_options.js?v=8d563738"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../../_static/js/theme.js"></script>
@@ -792,6 +792,92 @@
         <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write MCDC HDF5 </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
 
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote MCDC </span><span class="si">%s</span><span class="s2"> HDF5: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dataset_type</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_combined_mcdc_hdf5">
+<a class="viewcode-back" href="../../../api.html#pyepics.converters.hdf5.create_combined_mcdc_hdf5">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_combined_mcdc_hdf5</span><span class="p">(</span>
+    <span class="n">Z</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">eedl_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">epdl_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">eadl_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a **single** MCDC HDF5 file containing electron, photon, and atomic data.</span>
+
+<span class="sd">    Each element gets one file (e.g. ``Fe.h5``) with up to three</span>
+<span class="sd">    top-level groups: ``electron_reactions``, ``photon_reactions``,</span>
+<span class="sd">    and ``atomic_relaxation``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    Z : int</span>
+<span class="sd">        Atomic number (used for logging only; actual Z comes from the</span>
+<span class="sd">        parsed data).</span>
+<span class="sd">    output_path : Path | str</span>
+<span class="sd">        Path for the combined output HDF5 file.</span>
+<span class="sd">    eedl_path : Path | str | None</span>
+<span class="sd">        Path to the EEDL ENDF source file (electron).</span>
+<span class="sd">    epdl_path : Path | str | None</span>
+<span class="sd">        Path to the EPDL ENDF source file (photon).</span>
+<span class="sd">    eadl_path : Path | str | None</span>
+<span class="sd">        Path to the EADL ENDF source file (atomic relaxation).</span>
+<span class="sd">    validate : bool, optional</span>
+<span class="sd">        Post-parse validation.  Default ``True``.</span>
+<span class="sd">    overwrite : bool, optional</span>
+<span class="sd">        Overwrite existing file.  Default ``False``.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; create_combined_mcdc_hdf5(</span>
+<span class="sd">    ...     26, &quot;data/mcdc/Fe.h5&quot;,</span>
+<span class="sd">    ...     eedl_path=&quot;data/endf/eedl/EEDL.ZA026000.endf&quot;,</span>
+<span class="sd">    ...     epdl_path=&quot;data/endf/epdl/EPDL.ZA026000.endf&quot;,</span>
+<span class="sd">    ...     eadl_path=&quot;data/endf/eadl/EADL.ZA026000.endf&quot;,</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.converters.mcdc_hdf5</span><span class="w"> </span><span class="kn">import</span> <span class="n">write_mcdc_combined</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eadl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EADLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.epdl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPDLReader</span>
+
+    <span class="n">out</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">out</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output file </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2"> already exists and overwrite=False.&quot;</span><span class="p">)</span>
+
+    <span class="n">eedl_ds</span> <span class="o">=</span> <span class="n">EEDLReader</span><span class="p">()</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">eedl_path</span><span class="p">),</span> <span class="n">validate</span><span class="o">=</span><span class="n">validate</span><span class="p">)</span> <span class="k">if</span> <span class="n">eedl_path</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">epdl_ds</span> <span class="o">=</span> <span class="n">EPDLReader</span><span class="p">()</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">epdl_path</span><span class="p">),</span> <span class="n">validate</span><span class="o">=</span><span class="n">validate</span><span class="p">)</span> <span class="k">if</span> <span class="n">epdl_path</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">eadl_ds</span> <span class="o">=</span> <span class="n">EADLReader</span><span class="p">()</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">eadl_path</span><span class="p">),</span> <span class="n">validate</span><span class="o">=</span><span class="n">validate</span><span class="p">)</span> <span class="k">if</span> <span class="n">eadl_path</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">([</span><span class="n">eedl_ds</span><span class="p">,</span> <span class="n">epdl_ds</span><span class="p">,</span> <span class="n">eadl_ds</span><span class="p">]):</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;No ENDF source files found for Z=</span><span class="si">{</span><span class="n">Z</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="s2">&quot;At least one of eedl_path, epdl_path, eadl_path must be provided.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">out</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;w&quot;</span> <span class="k">if</span> <span class="n">overwrite</span> <span class="k">else</span> <span class="s2">&quot;w-&quot;</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">out</span><span class="p">),</span> <span class="n">mode</span><span class="p">)</span> <span class="k">as</span> <span class="n">h5f</span><span class="p">:</span>
+            <span class="n">write_mcdc_combined</span><span class="p">(</span><span class="n">h5f</span><span class="p">,</span> <span class="n">eedl</span><span class="o">=</span><span class="n">eedl_ds</span><span class="p">,</span> <span class="n">epdl</span><span class="o">=</span><span class="n">epdl_ds</span><span class="p">,</span> <span class="n">eadl</span><span class="o">=</span><span class="n">eadl_ds</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">ConversionError</span><span class="p">):</span>
+            <span class="k">raise</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write combined MCDC HDF5 </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+
+    <span class="n">libs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">eedl_ds</span><span class="p">:</span>
+        <span class="n">libs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;EEDL&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">epdl_ds</span><span class="p">:</span>
+        <span class="n">libs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;EPDL&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">eadl_ds</span><span class="p">:</span>
+        <span class="n">libs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;EADL&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote combined MCDC HDF5 (</span><span class="si">%s</span><span class="s2">): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;+&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">libs</span><span class="p">),</span> <span class="n">out</span><span class="p">)</span></div>
 
 </pre></div>
 
