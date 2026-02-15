@@ -629,7 +629,7 @@ def section_data_dictionaries(pdf, ctx):
         lib_dir = endf_dir / lib_name
         if not lib_dir.exists():
             continue
-        for fpath in sorted(lib_dir.glob("*.endf"))[:5]:  # sample first 5
+        for fpath in sorted(lib_dir.glob("*.endf")):  # scan all files
             try:
                 import endf
                 tape = endf.Material(fpath)

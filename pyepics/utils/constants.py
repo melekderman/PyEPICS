@@ -8,14 +8,15 @@
 """
 Physical constants and data-mapping tables used across PyEPICS
 
-All constants are sourced from NIST CODATA 2018 [1]_.  Mapping
+All constants are sourced from NIST CODATA 2018 [constants-1]_.  Mapping
 dictionaries use ``(MF, MT)`` integer tuples as keys so that look-ups
 from ENDF section identifiers are O(1).
 
 References
 ----------
-.. [1] NIST, "The 2018 CODATA Recommended Values of the Fundamental
-   Physical Constants", https://physics.nist.gov/cuu/pdf/wallet_2018.pdf
+.. [constants-1] NIST, "The 2018 CODATA Recommended Values of the
+   Fundamental Physical Constants",
+   https://physics.nist.gov/cuu/pdf/wallet_2018.pdf
 """
 
 from __future__ import annotations

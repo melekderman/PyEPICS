@@ -59,6 +59,7 @@ from pyepics.converters.hdf5 import (
     create_raw_hdf5,
     create_mcdc_hdf5,
 )
+from pyepics.client import EPICSClient, ElementProperties
 from pyepics.exceptions import (
     PyEPICSError,
     ParseError,
@@ -71,6 +72,9 @@ from pyepics.exceptions import (
 __all__ = [
     # Version
     "__version__",
+    # High-level client API
+    "EPICSClient",
+    "ElementProperties",
     # Readers
     "EEDLReader",
     "EADLReader",

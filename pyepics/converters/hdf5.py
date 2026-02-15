@@ -61,8 +61,8 @@ are stored as group attributes on the ``Z_{ZZZ}`` group.
 
 References
 ----------
-.. [1] HDF5 best practices, The HDF Group.
-.. [2] ENDF-6 Formats Manual (ENDF-102).
+- HDF5 best practices, The HDF Group.
+- ENDF-6 Formats Manual (ENDF-102).
 """
 
 from __future__ import annotations

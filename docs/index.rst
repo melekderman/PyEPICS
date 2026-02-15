@@ -6,6 +6,7 @@ PyEPICS Documentation
    :caption: Contents
 
    getting_started
+   user_guide
    pipeline
    data_sources
    api

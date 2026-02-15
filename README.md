@@ -17,6 +17,8 @@ PyEPICS parses EEDL, EPDL, and EADL files from the [LLNL EPICS 2025](https://nuc
 PyEPICS/
 ├── pyepics/                         # Source code
 │   ├── __init__.py              # Public API
+│   ├── client.py                # High-level element query API (EPICSClient)
+│   ├── plotting.py              # Optional plotting helpers (matplotlib)
 │   ├── cli.py                   # Batch processing CLI
 │   ├── exceptions.py            # Custom exception hierarchy
 │   ├── pyeedl_compat.py         # Backward-compatibility shim for legacy PyEEDL code
@@ -76,16 +78,28 @@ utils ← models ← readers ← converters (raw_hdf5 / mcdc_hdf5)
 | **models** | Typed `dataclass` records (`EEDLDataset`, `EPDLDataset`, `EADLDataset`) — the sole output of readers and sole input to converters |
 | **readers** | `EEDLReader`, `EPDLReader`, `EADLReader` — parse ENDF files via the `endf` library and return model instances |
 | **converters** | Two-step conversion: `raw_hdf5` (full-fidelity) and `mcdc_hdf5` (transport-optimised) |
+| **client** | High-level `EPICSClient` for querying/comparing element properties |
+| **plotting** | Optional visualisation helpers (requires `matplotlib`) |
 | **io** | Dataset download from LLNL |
 | **cli** | Batch processing for the full pipeline |
 
 ## Installation
 
 ```bash
-pip install numpy h5py endf
-# For downloading data from LLNL:
-pip install requests beautifulsoup4
+# From PyPI (when published)
+pip install pyepics-data
+
+# With all optional dependencies
+pip install "pyepics-data[all]"
+
+# From source (editable, for development)
+git clone https://github.com/melekderman/PyEPICS.git
+cd PyEPICS
+pip install -e ".[dev]"
 ```
+
+See [INSTALL.md](INSTALL.md) for full details on optional extras, developer
+setup, and platform notes.
 
 ---
 
@@ -216,10 +230,44 @@ download_all()                 # downloads all three
 
 ## Quick Start
 
+### High-Level Client API
+
+```python
+from pyepics import EPICSClient
+
+client = EPICSClient("data/endf")
+
+# Query a single element (by symbol, name, or Z)
+fe = client.get_element("Fe")
+print(fe.Z, fe.symbol)            # 26, "Fe"
+print(fe.binding_energies)         # {'K': 7112.0, 'L1': 844.6, ...}
+print(fe.electron_cross_section_labels)  # ['xs_tot', 'xs_el', ...]
+
+# Compare multiple elements
+rows = client.compare(["Fe", "Cu", "Au"])
+
+# DataFrame output (requires pandas)
+df = client.compare_df(["Fe", "Cu", "Au"])
+
+# Get raw cross-section arrays
+energy, xs = client.get_cross_section("Fe", "xs_tot")
+```
+
+### Plotting (requires matplotlib)
+
+```python
+from pyepics.plotting import plot_cross_sections, compare_cross_sections
+
+plot_cross_sections(client, "Fe")
+compare_cross_sections(client, ["C", "Fe", "Au"], "xs_tot")
+```
+
+### Low-Level Reader API
+
 ```python
 from pyepics import EEDLReader
 
-# Parse an EEDL file
+# Parse an EEDL file directly
 reader = EEDLReader()
 dataset = reader.read("data/endf/eedl/EEDL.ZA026000.endf")
 print(dataset.Z, dataset.symbol)  # 26, "Fe"
@@ -242,7 +290,7 @@ PyEPICSError
 ## Running Tests
 
 ```bash
-pip install pytest
+pip install -e ".[dev]"
 python -m pytest tests/ -v
 ```
 

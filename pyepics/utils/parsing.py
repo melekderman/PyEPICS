@@ -28,7 +28,7 @@ exponent, e.g. ``" 1.23456-03"``).
 
 References
 ----------
-.. [1] ENDF-6 Formats Manual (ENDF-102), BNL-90365-2009 Rev. 2, §0.6.
+- ENDF-6 Formats Manual (ENDF-102), BNL-90365-2009 Rev. 2, §0.6.
 """
 
 from __future__ import annotations
