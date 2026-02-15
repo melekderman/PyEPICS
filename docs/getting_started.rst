@@ -8,7 +8,7 @@ Installation
 
    pip install numpy h5py endf
 
-   # For downloading data from IAEA:
+   # For downloading data from LLNL:
    pip install requests beautifulsoup4
 
 Quick Start

@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -28,9 +28,9 @@ transport code.  These differ from the "raw" format in several ways:
 
 Output Directories
 ------------------
-* ``mcdc_data/``             — EEDL (electron)
-* ``mcdc_data_photon/``      — EPDL (photon)
-* ``mcdc_data_atomic/``      — EADL (atomic)
+* ``data/mcdc/electron/``    — EEDL (electron)
+* ``data/mcdc/photon/``      — EPDL (photon)
+* ``data/mcdc/atomic/``      — EADL (atomic)
 
 See Also
 --------
@@ -125,6 +125,7 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
 
     # Interpolation helper
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(
                 xs_energy_grid, xs[key].energy, xs[key].cross_section,
@@ -258,6 +259,7 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     xs_energy_grid = xs["xs_tot"].energy
 
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(
                 xs_energy_grid, xs[key].energy, xs[key].cross_section,

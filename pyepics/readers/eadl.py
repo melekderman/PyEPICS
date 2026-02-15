@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -29,7 +29,8 @@ File Format Assumptions
 References
 ----------
 .. [1] ENDF-6 Formats Manual (ENDF-102, BNL-90365-2009 Rev. 2), §28.
-.. [2] IAEA Nuclear Data Services — EPICS 2023.
+.. [2] LLNL Nuclear Data — EPICS 2025.
+   https://nuclear.llnl.gov/EPICS/
 """
 
 from __future__ import annotations

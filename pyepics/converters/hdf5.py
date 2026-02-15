@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -154,10 +154,9 @@ def _create_xs_dataset(
 def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     """Write an EEDL dataset to the ``/EEDL/Z_{ZZZ}`` group
 
-    Reproduces the MCDC-compatible layout used by the original PyEEDL
-    pipeline, including interpolation of all cross sections onto a
-    common energy grid and computation of small-angle scattering
-    cosine distributions.
+    Produces the MCDC-compatible layout, including interpolation of all
+    cross sections onto a common energy grid and computation of
+    small-angle scattering cosine distributions.
 
     Parameters
     ----------
@@ -184,6 +183,7 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
 
     # Helper to interpolate onto grid
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(xs_energy_grid, xs[key].energy, xs[key].cross_section)
         return np.zeros_like(xs_energy_grid)
@@ -306,6 +306,7 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     xs_energy_grid = xs["xs_tot"].energy
 
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(xs_energy_grid, xs[key].energy, xs[key].cross_section)
         return np.zeros_like(xs_energy_grid)
@@ -516,7 +517,7 @@ def convert_dataset_to_hdf5(
     --------
     >>> convert_dataset_to_hdf5(
     ...     "EEDL",
-    ...     "eedl/EEDL.ZA026000.endf",
+    ...     "data/endf/eedl/EEDL.ZA026000.endf",
     ...     "output/Fe.h5",
     ...     overwrite=True,
     ... )
@@ -615,7 +616,7 @@ def create_raw_hdf5(
 
     Examples
     --------
-    >>> create_raw_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "raw_data/Fe.h5")
+    >>> create_raw_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/raw/electron/Fe.h5")
     """
     from pyepics.converters.raw_hdf5 import (
         write_raw_eedl,
@@ -677,7 +678,7 @@ def create_mcdc_hdf5(
 
     Examples
     --------
-    >>> create_mcdc_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "mcdc_data/Fe.h5")
+    >>> create_mcdc_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/mcdc/electron/Fe.h5")
     """
     from pyepics.converters.mcdc_hdf5 import (
         write_mcdc_eedl,

@@ -26,10 +26,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install numpy h5py endf sphinx sphinx-rtd-theme myst-parser
 
-      - name: Build docs
+      - name: Build docs (strict — fail on warnings)
         run: |
           cd docs
-          make html
+          make html SPHINXOPTS="-W --keep-going"
+
+      - name: Verify autodoc coverage
+        run: |
+          cd docs
+          python -c "
+          import importlib, inspect, sys
+          sys.path.insert(0, '..')
+          import pyepics
+          public = [name for name in pyepics.__all__ if not name.startswith('_')]
+          missing = []
+          for name in public:
+              obj = getattr(pyepics, name)
+              if callable(obj) and not inspect.getdoc(obj):
+                  missing.append(name)
+          if missing:
+              print(f'Missing docstrings: {missing}')
+              sys.exit(1)
+          print(f'All {len(public)} public symbols have docstrings.')
+          "
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'

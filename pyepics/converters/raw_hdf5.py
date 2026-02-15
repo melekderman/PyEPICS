@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -18,9 +18,9 @@ or convert the data with their own tools.
 
 Output Directories
 ------------------
-* ``raw_data/``           — EEDL (electron) raw files
-* ``raw_data_photon/``    — EPDL (photon)  raw files
-* ``raw_data_atomic/``    — EADL (atomic)  raw files
+* ``data/raw/electron/``  — EEDL (electron) raw files
+* ``data/raw/photon/``    — EPDL (photon)  raw files
+* ``data/raw/atomic/``    — EADL (atomic)  raw files
 
 HDF5 Layout — EEDL
 -------------------

@@ -2,19 +2,19 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
 PyEPICS - Python library for reading and converting EPICS nuclear data
 
-Parse EEDL, EADL, and EPDL files from the IAEA EPICS (Electron Photon
+Parse EEDL, EADL, and EPDL files from the LLNL EPICS 2025 (Electron Photon
 Interaction Cross Sections) database and convert them into structured
 HDF5 format suitable for Monte Carlo transport codes.
 
 Pipeline
 --------
-1. **Download** ENDF files from IAEA:
+1. **Download** ENDF files from LLNL:
    ``python -m pyepics.cli download``
 
 2. **Raw HDF5** (full-fidelity, original grids):
@@ -42,8 +42,8 @@ utils
 Examples
 --------
 >>> from pyepics import EEDLReader, create_raw_hdf5, create_mcdc_hdf5
->>> create_raw_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "raw_data/Fe.h5")
->>> create_mcdc_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "mcdc_data/Fe.h5")
+>>> create_raw_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/raw/electron/Fe.h5")
+>>> create_mcdc_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/mcdc/electron/Fe.h5")
 """
 
 from __future__ import annotations

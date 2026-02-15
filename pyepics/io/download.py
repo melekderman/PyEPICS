@@ -2,26 +2,26 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
 EPICS dataset downloader
 
-Downloads EEDL, EPDL, and EADL ENDF files from the IAEA Nuclear Data
-Services website.
+Downloads EEDL, EPDL, and EADL ENDF files from the LLNL Nuclear Data
+website (EPICS 2025).
 
 Data Sources
 ------------
-* EEDL: ``https://www-nds.iaea.org/epics/ENDF2023/EEDL.ELEMENTS/``
-* EPDL: ``https://www-nds.iaea.org/epics/ENDF2023/EPDL.ELEMENTS/``
-* EADL: ``https://www-nds.iaea.org/epics/ENDF2023/EADL.ELEMENTS/``
+* EEDL: ``https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL.ELEMENTS/``
+* EPDL: ``https://nuclear.llnl.gov/EPICS/ENDF2025/EPDL.ELEMENTS/``
+* EADL: ``https://nuclear.llnl.gov/EPICS/ENDF2025/EADL.ELEMENTS/``
 
 Examples
 --------
 >>> from pyepics.io.download import download_library, download_all
->>> download_library("eedl")           # downloads to ./eedl/
->>> download_all(out_dir="data")       # downloads all three to data/{lib}/
+>>> download_library("eedl")           # downloads to ./data/endf/eedl/
+>>> download_all(out_dir="data/endf")   # downloads all three
 """
 
 from __future__ import annotations
@@ -41,17 +41,17 @@ logger = logging.getLogger(__name__)
 
 LIBRARY_URLS: dict[str, dict[str, str]] = {
     "eedl": {
-        "url": "https://www-nds.iaea.org/epics/ENDF2023/EEDL.ELEMENTS/getza.htm",
+        "url": "https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL.ELEMENTS/getza.htm",
         "prefix": "EEDL",
         "description": "Evaluated Electron Data Library",
     },
     "epdl": {
-        "url": "https://www-nds.iaea.org/epics/ENDF2023/EPDL.ELEMENTS/getza.htm",
+        "url": "https://nuclear.llnl.gov/EPICS/ENDF2025/EPDL.ELEMENTS/getza.htm",
         "prefix": "EPDL",
         "description": "Evaluated Photon Data Library",
     },
     "eadl": {
-        "url": "https://www-nds.iaea.org/epics/ENDF2023/EADL.ELEMENTS/getza.htm",
+        "url": "https://nuclear.llnl.gov/EPICS/ENDF2025/EADL.ELEMENTS/getza.htm",
         "prefix": "EADL",
         "description": "Evaluated Atomic Data Library",
     },
@@ -67,9 +67,9 @@ def download_library(
     library_name: Literal["eedl", "epdl", "eadl"],
     out_dir: Path | str | None = None,
 ) -> Path:
-    """Download a specific EPICS library from the IAEA website
+    """Download a specific EPICS library from the LLNL website
 
-    Fetches the IAEA index page for the requested library, discovers all
+    Fetches the LLNL index page for the requested library, discovers all
     element ENDF files, and downloads each one to *out_dir*.
 
     Parameters
@@ -137,7 +137,7 @@ def download_library(
     if not links:
         raise DownloadError(
             f"No download links found on {base_url}.  "
-            "The IAEA page format may have changed."
+            "The LLNL page format may have changed."
         )
 
     n_downloaded = 0
@@ -173,7 +173,7 @@ def download_all(out_dir: Path | str | None = None) -> dict[str, Path]:
     ----------
     out_dir : Path | str | None, optional
         Parent output directory.  Each library will be placed in a
-        sub-folder (``eedl/``, ``epdl/``, ``eadl/``).  Defaults to
+        sub-folder (``data/endf/eedl/``, etc.).  Defaults to
         the current working directory.
 
     Returns

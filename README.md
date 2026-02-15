@@ -7,7 +7,7 @@
 
 > Python library for reading and converting EPICS (Electron Photon Interaction Cross Sections) nuclear data.
 
-PyEPICS parses EEDL, EPDL, and EADL files from the [IAEA EPICS 2023](https://www-nds.iaea.org/epics/) database (in ENDF-6 format) and converts them into structured HDF5 files suitable for Monte Carlo transport codes such as [MC/DC](https://github.com/CEMeNT-PSAAP/MCDC).
+PyEPICS parses EEDL, EPDL, and EADL files from the [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) database (in ENDF-6 format) and converts them into structured HDF5 files suitable for Monte Carlo transport codes such as [MC/DC](https://github.com/CEMeNT-PSAAP/MCDC).
 
 ---
 
@@ -15,7 +15,7 @@ PyEPICS parses EEDL, EPDL, and EADL files from the [IAEA EPICS 2023](https://www
 
 ```
 PyEPICS/
-├── pyepics/
+├── pyepics/                         # Source code
 │   ├── __init__.py              # Public API
 │   ├── cli.py                   # Batch processing CLI
 │   ├── exceptions.py            # Custom exception hierarchy
@@ -36,7 +36,20 @@ PyEPICS/
 │   │   ├── parsing.py           # ENDF format parsing helpers
 │   │   └── validation.py        # Post-parse validation routines
 │   └── io/
-│       └── download.py          # Dataset downloader from IAEA
+│       └── download.py          # Dataset downloader from LLNL
+├── data/                            # All data (gitignored)
+│   ├── endf/                    # Downloaded ENDF source files
+│   │   ├── eedl/                # EEDL electron data
+│   │   ├── epdl/                # EPDL photon data
+│   │   └── eadl/                # EADL atomic relaxation data
+│   ├── raw/                     # Generated raw HDF5 files
+│   │   ├── electron/
+│   │   ├── photon/
+│   │   └── atomic/
+│   └── mcdc/                    # Generated MCDC HDF5 files
+│       ├── electron/
+│       ├── photon/
+│       └── atomic/
 └── tests/
     ├── conftest.py              # Shared pytest fixtures
     ├── test_eedl.py             # EEDL reader + parsing + validation tests
@@ -44,7 +57,9 @@ PyEPICS/
     ├── test_eadl.py             # EADL reader tests
     ├── test_hdf5.py             # Legacy HDF5 converter tests
     ├── test_pipeline.py         # Raw + MCDC pipeline tests
-    └── generate_report.py       # PDF regression-test report generator
+    ├── generate_report.py       # PDF regression-test report generator
+    ├── fixtures/                # Reference validation data
+    └── reports/                 # Generated regression reports
 ```
 
 ## Architecture
@@ -61,14 +76,14 @@ utils ← models ← readers ← converters (raw_hdf5 / mcdc_hdf5)
 | **models** | Typed `dataclass` records (`EEDLDataset`, `EPDLDataset`, `EADLDataset`) — the sole output of readers and sole input to converters |
 | **readers** | `EEDLReader`, `EPDLReader`, `EADLReader` — parse ENDF files via the `endf` library and return model instances |
 | **converters** | Two-step conversion: `raw_hdf5` (full-fidelity) and `mcdc_hdf5` (transport-optimised) |
-| **io** | Dataset download from IAEA |
+| **io** | Dataset download from LLNL |
 | **cli** | Batch processing for the full pipeline |
 
 ## Installation
 
 ```bash
 pip install numpy h5py endf
-# For downloading data from IAEA:
+# For downloading data from LLNL:
 pip install requests beautifulsoup4
 ```
 
@@ -76,26 +91,26 @@ pip install requests beautifulsoup4
 
 ## Data Pipeline
 
-PyEPICS follows a three-step pipeline, mirroring the PyEEDL workflow:
+PyEPICS follows a three-step pipeline:
 
 ```
-IAEA website                    download
+LLNL website                    download
     │                           ─────────────────────►
     ▼
-eedl/ epdl/ eadl/              raw ENDF files (.endf)
+data/endf/{eedl,epdl,eadl}/    raw ENDF files (.endf)
     │                           ─────────────────────►
     ▼
-raw_data/ raw_data_photon/     raw HDF5 (original grids, breakpoints)
-raw_data_atomic/                for external users
+data/raw/{electron,photon,     raw HDF5 (original grids, breakpoints)
+          atomic}/              for external users
     │                           ─────────────────────►
     ▼
-mcdc_data/ mcdc_data_photon/   MCDC HDF5 (common grid, PDFs)
-mcdc_data_atomic/               for transport codes
+data/mcdc/{electron,photon,    MCDC HDF5 (common grid, PDFs)
+           atomic}/             for transport codes
 ```
 
-### Step 1: Download ENDF Data from IAEA
+### Step 1: Download ENDF Data from LLNL
 
-Download all three EPICS libraries (EEDL, EPDL, EADL) from the IAEA Nuclear Data Services:
+Download all three EPICS libraries (EEDL, EPDL, EADL) from LLNL Nuclear Data:
 
 ```bash
 # Download all libraries
@@ -111,9 +126,9 @@ python -m pyepics.cli download --data-dir /path/to/data
 This creates three directories with `.endf` files:
 
 ```
-eedl/   ← EEDL.ZA001000.endf, EEDL.ZA002000.endf, ... (Z=1–100)
-epdl/   ← EPDL.ZA001000.endf, ... 
-eadl/   ← EADL.ZA001000.endf, ...
+data/endf/eedl/   ← EEDL.ZA001000.endf, EEDL.ZA002000.endf, ... (Z=1–100)
+data/endf/epdl/   ← EPDL.ZA001000.endf, ... 
+data/endf/eadl/   ← EADL.ZA001000.endf, ...
 ```
 
 ### Step 2: Create Raw HDF5 Files
@@ -137,9 +152,9 @@ python -m pyepics.cli raw --overwrite
 Output directories:
 
 ```
-raw_data/          ← H.h5, He.h5, ..., Fe.h5, ... (electron)
-raw_data_photon/   ← H.h5, He.h5, ...              (photon)
-raw_data_atomic/   ← H.h5, He.h5, ...              (atomic relaxation)
+data/raw/electron/   ← H.h5, He.h5, ..., Fe.h5, ... (electron)
+data/raw/photon/     ← H.h5, He.h5, ...              (photon)
+data/raw/atomic/     ← H.h5, He.h5, ...              (atomic relaxation)
 ```
 
 ### Step 3: Create MCDC HDF5 Files
@@ -160,9 +175,9 @@ python -m pyepics.cli mcdc --z-min 26 --z-max 26   # Fe only
 Output directories:
 
 ```
-mcdc_data/          ← H.h5, He.h5, ..., Fe.h5, ... (electron)
-mcdc_data_photon/   ← H.h5, He.h5, ...              (photon)
-mcdc_data_atomic/   ← H.h5, He.h5, ...              (atomic relaxation)
+data/mcdc/electron/   ← H.h5, He.h5, ..., Fe.h5, ... (electron)
+data/mcdc/photon/     ← H.h5, He.h5, ...              (photon)
+data/mcdc/atomic/     ← H.h5, He.h5, ...              (atomic relaxation)
 ```
 
 ### Full Pipeline (Raw + MCDC in One Step)
@@ -186,14 +201,14 @@ You can also use the pipeline functions directly from Python:
 from pyepics import create_raw_hdf5, create_mcdc_hdf5
 
 # Step 2: Raw HDF5
-create_raw_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "raw_data/Fe.h5", overwrite=True)
+create_raw_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/raw/electron/Fe.h5", overwrite=True)
 
 # Step 3: MCDC HDF5
-create_mcdc_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "mcdc_data/Fe.h5", overwrite=True)
+create_mcdc_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/mcdc/electron/Fe.h5", overwrite=True)
 
 # Download programmatically
 from pyepics.io.download import download_library, download_all
-download_library("eedl")      # downloads to ./eedl/
+download_library("eedl")      # downloads to ./data/endf/eedl/
 download_all()                 # downloads all three
 ```
 
@@ -206,7 +221,7 @@ from pyepics import EEDLReader
 
 # Parse an EEDL file
 reader = EEDLReader()
-dataset = reader.read("eedl/EEDL.ZA026000.endf")
+dataset = reader.read("data/endf/eedl/EEDL.ZA026000.endf")
 print(dataset.Z, dataset.symbol)  # 26, "Fe"
 print(list(dataset.cross_sections.keys()))  # ['xs_tot', 'xs_el', 'xs_lge', ...]
 ```
@@ -233,11 +248,32 @@ python -m pytest tests/ -v
 
 ## Backward Compatibility
 
-A `pyeedl_compat` shim re-exports all legacy `pyeedl` symbols:
+A `pyeedl_compat` shim re-exports legacy API symbols for backward compatibility:
 
 ```python
 from pyepics.pyeedl_compat import PERIODIC_TABLE, float_endf, SUBSHELL_LABELS
 ```
+
+## Data Sources
+
+PyEPICS uses the following authoritative data sources:
+
+| Data Type | Source | Reference |
+|---|---|---|
+| **Electron cross sections** | EEDL (Evaluated Electron Data Library) | [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) |
+| **Photon cross sections** | EPDL (Evaluated Photon Data Library) | [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) |
+| **Atomic relaxation** | EADL (Evaluated Atomic Data Library) | [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) |
+| **Binding energies** | EADL via ENDF-6 format (not NIST) | Parsed from EADL `.endf` files |
+| **Physical constants** | NIST CODATA 2018 | [NIST CODATA](https://physics.nist.gov/cuu/pdf/wallet_2018.pdf) |
+
+> **Note:** Binding energies are sourced from EADL (parsed from ENDF files), not from
+> the NIST X-Ray Transition Energies database. The reference validation data in
+> `tests/fixtures/reference_binding_energies.csv` is extracted from EEDL ENDF files
+> and compared against the PyEPICS-parsed values to ensure round-trip consistency.
+
+## Acknowledgements
+
+This work was supported by the Center for Advancing the Radiation Resilience of Electronics (CARRE), a PSAAP-IV project funded by the Department of Energy, grant number: DE-NA0004268.
 
 ## License
 

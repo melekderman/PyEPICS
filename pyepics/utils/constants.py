@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -221,6 +221,9 @@ SUBSHELL_DESIGNATORS_INV: dict[str, int] = {
 # ---------------------------------------------------------------------------
 
 MF_MT: dict[tuple[int, int], str] = {
+    # MF=1 : General Information / Directory
+    # ENDF-6 §1.1 — every material begins with MF=1/MT=451 descriptive data.
+    (1, 451): "General Information / Directory",
     # MF=23 : Electron Cross Sections
     (23, 501): "Total Electron Cross Sections",
     (23, 522): "Ionization (sum of subshells)",
@@ -251,10 +254,22 @@ MF_MT: dict[tuple[int, int], str] = {
     (23, 554): "O5 (5d5/2) Electroionization Subshell Cross Sections",
     (23, 555): "O6 (5f5/2) Electroionization Subshell Cross Sections",
     (23, 556): "O7 (5f7/2) Electroionization Subshell Cross Sections",
+    (23, 557): "O8 (5g7/2) Electroionization Subshell Cross Sections",
+    (23, 558): "O9 (5g9/2) Electroionization Subshell Cross Sections",
     (23, 559): "P1 (6s1/2) Electroionization Subshell Cross Sections",
     (23, 560): "P2 (6p1/2) Electroionization Subshell Cross Sections",
     (23, 561): "P3 (6p3/2) Electroionization Subshell Cross Sections",
+    (23, 562): "P4 (6d3/2) Electroionization Subshell Cross Sections",
+    (23, 563): "P5 (6d5/2) Electroionization Subshell Cross Sections",
+    (23, 564): "P6 (6f5/2) Electroionization Subshell Cross Sections",
+    (23, 565): "P7 (6f7/2) Electroionization Subshell Cross Sections",
+    (23, 566): "P8 (6g7/2) Electroionization Subshell Cross Sections",
+    (23, 567): "P9 (6g9/2) Electroionization Subshell Cross Sections",
+    (23, 568): "P10 (6h7/2) Electroionization Subshell Cross Sections",
+    (23, 569): "P11 (6h9/2) Electroionization Subshell Cross Sections",
     (23, 570): "Q1 (7s1/2) Electroionization Subshell Cross Sections",
+    (23, 571): "Q2 (7p1/2) Electroionization Subshell Cross Sections",
+    (23, 572): "Q3 (7p3/2) Electroionization Subshell Cross Sections",
     # MF=26 : Angular and Energy Distributions
     (26, 525): "Large Angle Elastic Angular Distributions",
     (26, 527): "Bremsstrahlung Photon Energy Spectra and Electron Average Energy Loss",
@@ -302,6 +317,8 @@ MF_MT: dict[tuple[int, int], str] = {
 """Human-readable descriptions for every EEDL (MF, MT) section pair."""
 
 SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
+    # MF=1 general information
+    (1, 451): "general_info",
     # MF=23 cross sections
     (23, 501): "xs_tot",   (23, 522): "xs_ion",
     (23, 525): "xs_lge",   (23, 526): "xs_el",
@@ -346,10 +363,14 @@ SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
 # ---------------------------------------------------------------------------
 
 PHOTON_MF_MT: dict[tuple[int, int], str] = {
+    # MF=1 : General Information / Directory
+    # ENDF-6 §1.1 — every material begins with MF=1/MT=451 descriptive data.
+    (1, 451): "General Information / Directory",
     (23, 501): "Total Photon Cross Section",
     (23, 502): "Coherent (Rayleigh) Scattering Cross Section",
     (23, 504): "Incoherent (Compton) Scattering Cross Section",
     (23, 516): "Pair Production Cross Section (Total)",
+    (23, 515): "Pair Production Cross Section (Electron Field)",
     (23, 517): "Pair Production Cross Section (Nuclear Field)",
     (23, 518): "Pair Production Cross Section (Electron Field - Triplet)",
     (23, 522): "Total Photoelectric Cross Section",
@@ -381,6 +402,8 @@ PHOTON_MF_MT: dict[tuple[int, int], str] = {
     (23, 559): "P1 (6s1/2) Photoelectric Subshell Cross Section",
     (23, 560): "P2 (6p1/2) Photoelectric Subshell Cross Section",
     (23, 561): "P3 (6p3/2) Photoelectric Subshell Cross Section",
+    (23, 562): "P4 (6d3/2) Photoelectric Subshell Cross Section",
+    (23, 563): "P5 (6d5/2) Photoelectric Subshell Cross Section",
     (23, 570): "Q1 (7s1/2) Photoelectric Subshell Cross Section",
     (27, 502): "Coherent Scattering Form Factor",
     (27, 504): "Incoherent Scattering Function",
@@ -389,8 +412,10 @@ PHOTON_MF_MT: dict[tuple[int, int], str] = {
 }
 
 PHOTON_SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
+    (1, 451): "general_info",
     (23, 501): "xs_tot",
     (23, 502): "xs_coherent",      (23, 504): "xs_incoherent",
+    (23, 515): "xs_pair_efield",
     (23, 516): "xs_pair_total",    (23, 517): "xs_pair_nuclear",
     (23, 518): "xs_pair_electron", (23, 522): "xs_photoelectric",
     (23, 534): "xs_pe_K",   (23, 535): "xs_pe_L1",  (23, 536): "xs_pe_L2",
@@ -403,6 +428,7 @@ PHOTON_SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
     (23, 553): "xs_pe_O4",  (23, 554): "xs_pe_O5",  (23, 555): "xs_pe_O6",
     (23, 556): "xs_pe_O7",  (23, 557): "xs_pe_O8",  (23, 558): "xs_pe_O9",
     (23, 559): "xs_pe_P1",  (23, 560): "xs_pe_P2",  (23, 561): "xs_pe_P3",
+    (23, 562): "xs_pe_P4",  (23, 563): "xs_pe_P5",
     (23, 570): "xs_pe_Q1",
     (27, 502): "ff_coherent",   (27, 504): "sf_incoherent",
     (27, 505): "asf_imag",      (27, 506): "asf_real",
@@ -414,10 +440,14 @@ PHOTON_SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
 # ---------------------------------------------------------------------------
 
 ATOMIC_MF_MT: dict[tuple[int, int], str] = {
+    # MF=1 : General Information / Directory
+    # ENDF-6 §1.1 — every material begins with MF=1/MT=451 descriptive data.
+    (1, 451): "General Information / Directory",
     (28, 533): "Atomic Relaxation Data",
 }
 
 ATOMIC_SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
+    (1, 451): "general_info",
     (28, 533): "atomic_relax",
 }
 
@@ -433,6 +463,7 @@ MF23: dict[str, str] = {
     "sigma.interpolation": "INT: interpolation law code for each region",
     "ZA":                  "ZA identifier of the target (Z × 1000 + A)",
     "AWR":                 "Atomic weight ratio of the target",
+    "LRF":                 "Resonance/interpolation flag (if present)",
 }
 
 MF26: dict[str, str] = {
@@ -445,6 +476,7 @@ MF26: dict[str, str] = {
     "distribution.NR":                  "Number of interpolation regions",
     "distribution.NE":                  "Number of incident-energy points",
     "distribution.E":                   "Array of incident energies (eV)",
+    "distribution.E_int":               "Tabulated2D full energy–energy distribution object",
     "distribution.distribution.ND":     "Number of discrete outgoing-energy points",
     "distribution.distribution.NA":     "Number of angular parameters",
     "distribution.distribution.NW":     "Total words in the LIST record",

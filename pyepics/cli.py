@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -10,7 +10,7 @@ PyEPICS command-line interface
 
 Provides batch-processing commands for the full data pipeline:
 
-1. **download** — Download ENDF files from IAEA
+1. **download** — Download ENDF files from LLNL
 2. **raw**      — Create raw HDF5 files (original grids, breakpoints)
 3. **mcdc**     — Create MCDC-format HDF5 files (common grid, PDFs)
 4. **all**      — Run raw + mcdc for a set of libraries
@@ -33,15 +33,19 @@ Usage
 
 Directory structure after a full run::
 
-    eedl/               ← downloaded ENDF (EEDL)
-    epdl/               ← downloaded ENDF (EPDL)
-    eadl/               ← downloaded ENDF (EADL)
-    raw_data/           ← raw HDF5 (electron)
-    raw_data_photon/    ← raw HDF5 (photon)
-    raw_data_atomic/    ← raw HDF5 (atomic)
-    mcdc_data/          ← MCDC HDF5 (electron)
-    mcdc_data_photon/   ← MCDC HDF5 (photon)
-    mcdc_data_atomic/   ← MCDC HDF5 (atomic)
+    data/
+        endf/
+            eedl/           ← downloaded ENDF (EEDL)
+            epdl/           ← downloaded ENDF (EPDL)
+            eadl/           ← downloaded ENDF (EADL)
+        raw/
+            electron/       ← raw HDF5 (electron)
+            photon/         ← raw HDF5 (photon)
+            atomic/         ← raw HDF5 (atomic)
+        mcdc/
+            electron/       ← MCDC HDF5 (electron)
+            photon/         ← MCDC HDF5 (photon)
+            atomic/         ← MCDC HDF5 (atomic)
 """
 
 from __future__ import annotations
@@ -63,26 +67,26 @@ logger = logging.getLogger("pyepics.cli")
 LIBRARY_CONFIG = {
     "electron": {
         "dataset_type": "EEDL",
-        "endf_dir": "eedl",
+        "endf_dir": "data/endf/eedl",
         "endf_prefix": "EEDL",
-        "raw_dir": "raw_data",
-        "mcdc_dir": "mcdc_data",
+        "raw_dir": "data/raw/electron",
+        "mcdc_dir": "data/mcdc/electron",
         "download_key": "eedl",
     },
     "photon": {
         "dataset_type": "EPDL",
-        "endf_dir": "epdl",
+        "endf_dir": "data/endf/epdl",
         "endf_prefix": "EPDL",
-        "raw_dir": "raw_data_photon",
-        "mcdc_dir": "mcdc_data_photon",
+        "raw_dir": "data/raw/photon",
+        "mcdc_dir": "data/mcdc/photon",
         "download_key": "epdl",
     },
     "atomic": {
         "dataset_type": "EADL",
-        "endf_dir": "eadl",
+        "endf_dir": "data/endf/eadl",
         "endf_prefix": "EADL",
-        "raw_dir": "raw_data_atomic",
-        "mcdc_dir": "mcdc_data_atomic",
+        "raw_dir": "data/raw/atomic",
+        "mcdc_dir": "data/mcdc/atomic",
         "download_key": "eadl",
     },
 }
@@ -113,7 +117,7 @@ def _element_symbol(Z: int) -> str:
 # ---------------------------------------------------------------------------
 
 def cmd_download(args):
-    """Download ENDF files from IAEA."""
+    """Download ENDF files from LLNL."""
     from pyepics.io.download import download_library
 
     base = Path(args.data_dir)
@@ -317,7 +321,7 @@ Examples:
     # Subcommands
     sub = parser.add_subparsers(dest="command", help="Pipeline step to run")
 
-    sub.add_parser("download", help="Download ENDF files from IAEA")
+    sub.add_parser("download", help="Download ENDF files from LLNL")
     sub.add_parser("raw", help="Create raw HDF5 files")
     sub.add_parser("mcdc", help="Create MCDC-format HDF5 files")
     sub.add_parser("all", help="Run raw + mcdc (full pipeline)")

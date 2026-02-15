@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -32,7 +32,8 @@ File Format Assumptions
 References
 ----------
 .. [1] ENDF-6 Formats Manual (ENDF-102, BNL-90365-2009 Rev. 2).
-.. [2] IAEA Nuclear Data Services — EPICS 2023.
+.. [2] LLNL Nuclear Data — EPICS 2025.
+   https://nuclear.llnl.gov/EPICS/
 """
 
 from __future__ import annotations
@@ -80,7 +81,7 @@ class EEDLReader(BaseReader):
 
     Extracts electron interaction cross sections (MF=23) and angular /
     energy distributions (MF=26) from a single-element ENDF file generated
-    by the IAEA EPICS 2023 pipeline.
+    by the LLNL EPICS 2025 pipeline.
 
     The reader produces an :class:`~pyepics.models.records.EEDLDataset`
     dataclass that can be passed directly to the HDF5 converter.
@@ -269,11 +270,11 @@ class EEDLReader(BaseReader):
                     for idx, sub in enumerate(sub_list):
                         E_out = sub.get("E'", [])
                         b_raw = sub.get("b")
-                        if b_raw is not None:
-                            for eo, bb in zip(E_out, b_raw):
-                                inc_e_arr.append(E_inc[idx])
-                                out_e_arr.append(eo)
-                                b_arr.append(float(bb))
+                        b_flat = b_raw.flatten() if b_raw is not None else []
+                        for eo, bb in zip(E_out, b_flat):
+                            inc_e_arr.append(E_inc[idx])
+                            out_e_arr.append(eo)
+                            b_arr.append(float(bb))
                     if inc_e_arr:
                         bremsstrahlung_spectra = DistributionRecord(
                             label=abbrev,
