@@ -18,13 +18,12 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Union
 
-from pyepics.models.records import EEDLDataset, EPDLDataset, EADLDataset
+from pyepics.models.records import EADLDataset, EEDLDataset, EPDLDataset
 
 logger = logging.getLogger(__name__)
 
-DatasetModel = Union[EEDLDataset, EPDLDataset, EADLDataset]
+DatasetModel = EEDLDataset | EPDLDataset | EADLDataset
 """Type alias for the union of all dataset model types."""
 
 

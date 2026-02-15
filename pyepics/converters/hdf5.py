@@ -88,7 +88,7 @@ from pyepics.models.records import (
     EPDLDataset,
 )
 from pyepics.readers.base import DatasetModel
-from pyepics.utils.constants import SUBSHELL_LABELS
+from pyepics.utils.constants import ELECTRON_SUBSHELL_LABELS
 from pyepics.utils.parsing import (
     build_pdf,
     linear_interpolation,
@@ -255,7 +255,7 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     _create_xs_dataset(ion_grp, "xs", xs_ion_total, "barns")
     subs_grp = ion_grp.create_group("subshells")
 
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         xs_key = f"xs_{shell_label}"
         spec_key = f"spec_{shell_label}"
 
@@ -337,7 +337,7 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     pe_grp = root.create_group("photoelectric")
     _create_xs_dataset(pe_grp, "xs", interp("xs_photoelectric"), "barns")
     pe_subs = pe_grp.create_group("subshells")
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         key = f"xs_pe_{shell_label}"
         if key not in xs:
             continue
@@ -537,8 +537,8 @@ def convert_dataset_to_hdf5(
         )
 
     # Select reader
-    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.eadl import EADLReader
+    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.epdl import EPDLReader
 
     reader_map = {
@@ -581,8 +581,8 @@ def convert_dataset_to_hdf5(
 
 def _get_reader(dataset_type: str):
     """Return the correct reader class for a dataset type."""
-    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.eadl import EADLReader
+    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.epdl import EPDLReader
     return {"EEDL": EEDLReader, "EADL": EADLReader, "EPDL": EPDLReader}[dataset_type]
 
@@ -619,9 +619,9 @@ def create_raw_hdf5(
     >>> create_raw_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/raw/electron/Fe.h5")
     """
     from pyepics.converters.raw_hdf5 import (
+        write_raw_eadl,
         write_raw_eedl,
         write_raw_epdl,
-        write_raw_eadl,
     )
 
     writers = {"EEDL": write_raw_eedl, "EPDL": write_raw_epdl, "EADL": write_raw_eadl}
@@ -681,9 +681,9 @@ def create_mcdc_hdf5(
     >>> create_mcdc_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/mcdc/electron/Fe.h5")
     """
     from pyepics.converters.mcdc_hdf5 import (
+        write_mcdc_eadl,
         write_mcdc_eedl,
         write_mcdc_epdl,
-        write_mcdc_eadl,
     )
 
     writers = {"EEDL": write_mcdc_eedl, "EPDL": write_mcdc_epdl, "EADL": write_mcdc_eadl}

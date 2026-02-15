@@ -40,7 +40,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Atomic-level building blocks
 # ---------------------------------------------------------------------------

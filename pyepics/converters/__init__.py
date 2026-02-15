@@ -22,8 +22,8 @@ from __future__ import annotations
 
 from pyepics.converters.hdf5 import (
     convert_dataset_to_hdf5,
-    create_raw_hdf5,
     create_mcdc_hdf5,
+    create_raw_hdf5,
 )
 
 __all__ = ["convert_dataset_to_hdf5", "create_raw_hdf5", "create_mcdc_hdf5"]

@@ -56,7 +56,7 @@ from pyepics.models.records import (
     EEDLDataset,
     EPDLDataset,
 )
-from pyepics.utils.constants import SUBSHELL_LABELS
+from pyepics.utils.constants import ELECTRON_SUBSHELL_LABELS
 from pyepics.utils.parsing import (
     build_pdf,
     linear_interpolation,
@@ -199,7 +199,7 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     _create_xs_dataset(ion_grp, "xs", xs_ion_total, "barns")
     subs_grp = ion_grp.create_group("subshells")
 
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         xs_key = f"xs_{shell_label}"
         spec_key = f"spec_{shell_label}"
         if xs_key not in xs:
@@ -292,7 +292,7 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     pe_grp = root.create_group("photoelectric")
     _create_xs_dataset(pe_grp, "xs", interp("xs_photoelectric"), "barns")
     pe_subs = pe_grp.create_group("subshells")
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         key = f"xs_pe_{shell_label}"
         if key not in xs:
             continue

@@ -20,12 +20,11 @@ Usage
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Sequence
-
-import numpy as np
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from pyepics.client import EPICSClient, ElementID
+    from pyepics.client import ElementID, EPICSClient
 
 
 def _import_matplotlib():
@@ -41,8 +40,8 @@ def _import_matplotlib():
 
 
 def plot_cross_sections(
-    client: "EPICSClient",
-    element: "ElementID",
+    client: EPICSClient,
+    element: ElementID,
     *,
     labels: Sequence[str] | None = None,
     library: str = "EEDL",
@@ -119,8 +118,8 @@ def plot_cross_sections(
 
 
 def compare_cross_sections(
-    client: "EPICSClient",
-    elements: Sequence["ElementID"],
+    client: EPICSClient,
+    elements: Sequence[ElementID],
     label: str,
     *,
     library: str = "EEDL",
@@ -187,8 +186,8 @@ def compare_cross_sections(
 
 
 def plot_binding_energies(
-    client: "EPICSClient",
-    elements: Sequence["ElementID"],
+    client: EPICSClient,
+    elements: Sequence[ElementID],
     *,
     subshell: str | None = None,
     title: str | None = None,
@@ -222,7 +221,6 @@ def plot_binding_energies(
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
 
-    from pyepics.client import _resolve_element
 
     # Collect data: subshell -> [(Z, BE)]
     data: dict[str, list[tuple[int, float]]] = {}
@@ -256,8 +254,8 @@ def plot_binding_energies(
 
 
 def plot_shell_binding_energies(
-    client: "EPICSClient",
-    element: "ElementID",
+    client: EPICSClient,
+    element: ElementID,
     *,
     title: str | None = None,
     ax: Any = None,

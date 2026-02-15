@@ -59,9 +59,9 @@ from pyepics.models.records import (
 )
 from pyepics.readers.base import BaseReader
 from pyepics.utils.constants import (
+    ELECTRON_SECTIONS_ABBREVS,
+    ELECTRON_SUBSHELL_LABELS,
     PERIODIC_TABLE,
-    SECTIONS_ABBREVS,
-    SUBSHELL_LABELS,
 )
 from pyepics.utils.parsing import (
     extract_atomic_number_from_path,
@@ -173,7 +173,7 @@ class EEDLReader(BaseReader):
         bremsstrahlung_spectra: DistributionRecord | None = None
 
         # -- MF=23: Cross Sections ----------------------------------------
-        for (mf, mt), abbrev in SECTIONS_ABBREVS.items():
+        for (mf, mt), abbrev in ELECTRON_SECTIONS_ABBREVS.items():
             if mf != 23 or (mf, mt) not in mat.section_data:
                 continue
 
@@ -200,7 +200,7 @@ class EEDLReader(BaseReader):
             logger.debug("  MF=23/MT=%d (%s): %d points", mt, abbrev, energy.size)
 
         # -- MF=26: Distributions -----------------------------------------
-        for (mf, mt), abbrev in SECTIONS_ABBREVS.items():
+        for (mf, mt), abbrev in ELECTRON_SECTIONS_ABBREVS.items():
             if mf != 26 or (mf, mt) not in mat.section_data:
                 continue
 
@@ -270,7 +270,7 @@ class EEDLReader(BaseReader):
                         E_out = sub.get("E'", [])
                         b_raw = sub.get("b")
                         b_flat = b_raw.flatten() if b_raw is not None else []
-                        for eo, bb in zip(E_out, b_flat):
+                        for eo, bb in zip(E_out, b_flat, strict=False):
                             inc_e_arr.append(E_inc[idx])
                             out_e_arr.append(eo)
                             b_arr.append(float(bb))
@@ -298,7 +298,7 @@ class EEDLReader(BaseReader):
                     E_out = sub.get("E'", [])
                     b_raw = sub.get("b")
                     b_flat = b_raw.flatten() if b_raw is not None else []
-                    for eo, bb in zip(E_out, b_flat):
+                    for eo, bb in zip(E_out, b_flat, strict=False):
                         inc_e_arr2.append(E_inc[idx])
                         out_e_arr2.append(eo)
                         b_arr2.append(float(bb))
@@ -312,8 +312,8 @@ class EEDLReader(BaseReader):
                     )
 
                 # Store binding energy from y_tab if available
-                if y_tab is not None and mt in SUBSHELL_LABELS:
-                    shell_label = SUBSHELL_LABELS[mt]
+                if y_tab is not None and mt in ELECTRON_SUBSHELL_LABELS:
+                    shell_label = ELECTRON_SUBSHELL_LABELS[mt]
                     xs_key = f"xs_{shell_label}"
                     if xs_key in cross_sections:
                         # Attach binding energy as first y_tab energy point

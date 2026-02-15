@@ -464,7 +464,7 @@ def small_angle_eta(Z: int, energy_eV: np.ndarray) -> np.ndarray:
        electrons and positrons by atoms, positive ions and molecules.
        *Computer Physics Communications*, 165(2), 157–190.
     """
-    from pyepics.utils.constants import FINE_STRUCTURE, ELECTRON_MASS
+    from pyepics.utils.constants import ELECTRON_MASS, FINE_STRUCTURE
 
     alpha = FINE_STRUCTURE
     mec2 = ELECTRON_MASS  # MeV

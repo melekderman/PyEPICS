@@ -28,13 +28,13 @@ import pytest
 from pyepics.utils.constants import (
     ATOMIC_MF_MT,
     ATOMIC_SECTIONS_ABBREVS,
-    MF_MT,
+    ELECTRON_MF_MT,
+    ELECTRON_SECTIONS_ABBREVS,
+    ELECTRON_SUBSHELL_LABELS,
+    PERIODIC_TABLE,
     PHOTON_MF_MT,
     PHOTON_SECTIONS_ABBREVS,
-    SECTIONS_ABBREVS,
-    SUBSHELL_LABELS,
     SUBSHELL_DESIGNATORS,
-    PERIODIC_TABLE,
 )
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ def _collect_endf_mf_mt(lib_name: str) -> set[tuple[int, int]]:
 @pytest.mark.parametrize(
     "lib_name, desc_dict, abbrev_dict",
     [
-        ("eedl", MF_MT, SECTIONS_ABBREVS),
+        ("eedl", ELECTRON_MF_MT, ELECTRON_SECTIONS_ABBREVS),
         ("epdl", PHOTON_MF_MT, PHOTON_SECTIONS_ABBREVS),
         ("eadl", ATOMIC_MF_MT, ATOMIC_SECTIONS_ABBREVS),
     ],
@@ -132,18 +132,18 @@ class TestInternalConsistency:
         assert len(PERIODIC_TABLE) >= 118
 
     def test_subshell_labels_non_empty(self):
-        assert len(SUBSHELL_LABELS) >= 1
+        assert len(ELECTRON_SUBSHELL_LABELS) >= 1
 
     def test_subshell_designators_non_empty(self):
         assert len(SUBSHELL_DESIGNATORS) >= 1
 
     def test_sections_abbrevs_non_empty(self):
-        assert len(SECTIONS_ABBREVS) >= 1
+        assert len(ELECTRON_SECTIONS_ABBREVS) >= 1
 
     def test_no_duplicate_abbreviations_eedl(self):
         """No two EEDL sections share the same abbreviation."""
-        vals = list(SECTIONS_ABBREVS.values())
-        assert len(vals) == len(set(vals)), "Duplicate abbreviations in SECTIONS_ABBREVS"
+        vals = list(ELECTRON_SECTIONS_ABBREVS.values())
+        assert len(vals) == len(set(vals)), "Duplicate abbreviations in ELECTRON_SECTIONS_ABBREVS"
 
     def test_no_duplicate_abbreviations_epdl(self):
         """No two EPDL sections share the same abbreviation."""

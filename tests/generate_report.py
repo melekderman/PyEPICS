@@ -81,17 +81,17 @@ def _lazy_imports():
     )
     from pyepics.utils.constants import (
         PERIODIC_TABLE,
-        MF_MT,
+        ELECTRON_MF_MT,
         PHOTON_MF_MT,
         ATOMIC_MF_MT,
         MF23,
         MF26,
         MF27,
         MF28,
-        SECTIONS_ABBREVS,
+        ELECTRON_SECTIONS_ABBREVS,
         PHOTON_SECTIONS_ABBREVS,
         ATOMIC_SECTIONS_ABBREVS,
-        SUBSHELL_LABELS,
+        ELECTRON_SUBSHELL_LABELS,
         SUBSHELL_DESIGNATORS,
         FINE_STRUCTURE,
         ELECTRON_MASS,
@@ -641,7 +641,7 @@ def section_data_dictionaries(pdf, ctx):
 
     # Compare PyEPICS mapping tables against ENDF contents
     mapping_checks = [
-        ("MF_MT (EEDL)", endf_mf_mt_sets.get("eedl", set()), M.MF_MT),
+        ("ELECTRON_MF_MT (EEDL)", endf_mf_mt_sets.get("eedl", set()), M.ELECTRON_MF_MT),
         ("PHOTON_MF_MT (EPDL)", endf_mf_mt_sets.get("epdl", set()), M.PHOTON_MF_MT),
         ("ATOMIC_MF_MT (EADL)", endf_mf_mt_sets.get("eadl", set()), M.ATOMIC_MF_MT),
     ]
@@ -675,9 +675,9 @@ def section_data_dictionaries(pdf, ctx):
     # Verify internal dictionary consistency
     internal_checks = [
         ("PERIODIC_TABLE", M.PERIODIC_TABLE, 100),  # Z=1..100
-        ("SUBSHELL_LABELS", M.SUBSHELL_LABELS, 1),
+        ("ELECTRON_SUBSHELL_LABELS", M.ELECTRON_SUBSHELL_LABELS, 1),
         ("SUBSHELL_DESIGNATORS", M.SUBSHELL_DESIGNATORS, 1),
-        ("SECTIONS_ABBREVS", M.SECTIONS_ABBREVS, 1),
+        ("ELECTRON_SECTIONS_ABBREVS", M.ELECTRON_SECTIONS_ABBREVS, 1),
     ]
 
     int_lines = [

@@ -299,7 +299,7 @@ python -m pytest tests/ -v
 A `pyeedl_compat` shim re-exports legacy API symbols for backward compatibility:
 
 ```python
-from pyepics.pyeedl_compat import PERIODIC_TABLE, float_endf, SUBSHELL_LABELS
+from pyepics.pyeedl_compat import PERIODIC_TABLE, float_endf, ELECTRON_SUBSHELL_LABELS
 ```
 
 ## Data Sources

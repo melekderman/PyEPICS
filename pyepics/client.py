@@ -25,9 +25,9 @@ Usage
 from __future__ import annotations
 
 import logging
-import os
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence, Union
+from typing import Any
 
 import numpy as np
 
@@ -45,7 +45,7 @@ from pyepics.utils.constants import PERIODIC_TABLE
 logger = logging.getLogger(__name__)
 
 # Type alias for element identifiers
-ElementID = Union[int, str]
+ElementID = int | str
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -161,6 +161,7 @@ class ElementProperties:
         photon: EPDLDataset | None = None,
         atomic: EADLDataset | None = None,
     ) -> None:
+        """Initialise an ElementProperties container."""
         self.Z = z
         self.symbol = symbol
         self.name = name
@@ -244,6 +245,7 @@ class ElementProperties:
         return d
 
     def __repr__(self) -> str:
+        """Return a developer-friendly string representation."""
         libs = []
         if self.electron:
             libs.append("EEDL")
@@ -257,9 +259,11 @@ class ElementProperties:
         )
 
     def __getitem__(self, key: str) -> Any:
+        """Allow dict-style access to :meth:`to_dict` keys."""
         return self.to_dict()[key]
 
     def __contains__(self, key: str) -> bool:
+        """Support ``key in props`` membership tests."""
         return key in self.to_dict()
 
 
@@ -288,6 +292,7 @@ class EPICSClient:
     """
 
     def __init__(self, data_dir: str | Path = "data/endf") -> None:
+        """Initialise the client with the path to ENDF data."""
         self._data_dir = Path(data_dir)
         self._eedl_reader = EEDLReader()
         self._epdl_reader = EPDLReader()

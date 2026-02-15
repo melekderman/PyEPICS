@@ -174,7 +174,7 @@ PERIODIC_TABLE: dict[int, dict[str, str]] = {
 # Subshell mappings
 # ---------------------------------------------------------------------------
 
-SUBSHELL_LABELS: dict[int, str] = {
+ELECTRON_SUBSHELL_LABELS: dict[int, str] = {
     534: "K",   535: "L1",  536: "L2",  537: "L3",
     538: "M1",  539: "M2",  540: "M3",  541: "M4",  542: "M5",
     543: "N1",  544: "N2",  545: "N3",  546: "N4",  547: "N5",
@@ -192,6 +192,9 @@ Used to identify specific electron-ionisation or photoelectric
 subshell cross-section sections.  MT 534 corresponds to the K shell,
 535–537 to L sub-shells, and so on through the Q shell.
 """
+
+SUBSHELL_LABELS = ELECTRON_SUBSHELL_LABELS
+"""Backward-compatible alias for :data:`ELECTRON_SUBSHELL_LABELS`."""
 
 SUBSHELL_DESIGNATORS: dict[int, str] = {
     1: "K",
@@ -221,7 +224,7 @@ SUBSHELL_DESIGNATORS_INV: dict[str, int] = {
 # Electron (EEDL) MF/MT tables
 # ---------------------------------------------------------------------------
 
-MF_MT: dict[tuple[int, int], str] = {
+ELECTRON_MF_MT: dict[tuple[int, int], str] = {
     # MF=1 : General Information / Directory
     # ENDF-6 §1.1 — every material begins with MF=1/MT=451 descriptive data.
     (1, 451): "General Information / Directory",
@@ -317,7 +320,10 @@ MF_MT: dict[tuple[int, int], str] = {
 }
 """Human-readable descriptions for every EEDL (MF, MT) section pair."""
 
-SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
+MF_MT = ELECTRON_MF_MT
+"""Backward-compatible alias for :data:`ELECTRON_MF_MT`."""
+
+ELECTRON_SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
     # MF=1 general information
     (1, 451): "general_info",
     # MF=23 cross sections
@@ -357,6 +363,9 @@ SECTIONS_ABBREVS: dict[tuple[int, int], str] = {
     (26, 570): "spec_Q1",   (26, 571): "spec_Q2",  (26, 572): "spec_Q3",
 }
 """Short mnemonic abbreviations for each EEDL (MF, MT) section."""
+
+SECTIONS_ABBREVS = ELECTRON_SECTIONS_ABBREVS
+"""Backward-compatible alias for :data:`ELECTRON_SECTIONS_ABBREVS`."""
 
 
 # ---------------------------------------------------------------------------
