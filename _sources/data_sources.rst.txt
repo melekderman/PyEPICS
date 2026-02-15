@@ -89,7 +89,7 @@ keeps three mapping dictionaries in ``pyepics/utils/constants.py``:
    * - Dictionary
      - Library
      - Purpose
-   * - ``MF_MT`` / ``SECTIONS_ABBREVS``
+   * - ``ELECTRON_MF_MT`` / ``ELECTRON_SECTIONS_ABBREVS``
      - EEDL
      - Electron cross-section & distribution sections
    * - ``PHOTON_MF_MT`` / ``PHOTON_SECTIONS_ABBREVS``

@@ -95,12 +95,11 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Sequence</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPICSClient</span><span class="p">,</span> <span class="n">ElementID</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">ElementID</span><span class="p">,</span> <span class="n">EPICSClient</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_import_matplotlib</span><span class="p">():</span>
@@ -118,8 +117,8 @@
 <div class="viewcode-block" id="plot_cross_sections">
 <a class="viewcode-back" href="../../api.html#pyepics.plotting.plot_cross_sections">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
-    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
-    <span class="n">element</span><span class="p">:</span> <span class="s2">&quot;ElementID&quot;</span><span class="p">,</span>
+    <span class="n">client</span><span class="p">:</span> <span class="n">EPICSClient</span><span class="p">,</span>
+    <span class="n">element</span><span class="p">:</span> <span class="n">ElementID</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">labels</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">library</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;EEDL&quot;</span><span class="p">,</span>
@@ -199,8 +198,8 @@
 <div class="viewcode-block" id="compare_cross_sections">
 <a class="viewcode-back" href="../../api.html#pyepics.plotting.compare_cross_sections">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">compare_cross_sections</span><span class="p">(</span>
-    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
-    <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="s2">&quot;ElementID&quot;</span><span class="p">],</span>
+    <span class="n">client</span><span class="p">:</span> <span class="n">EPICSClient</span><span class="p">,</span>
+    <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">ElementID</span><span class="p">],</span>
     <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">library</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;EEDL&quot;</span><span class="p">,</span>
@@ -270,8 +269,8 @@
 <div class="viewcode-block" id="plot_binding_energies">
 <a class="viewcode-back" href="../../api.html#pyepics.plotting.plot_binding_energies">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">plot_binding_energies</span><span class="p">(</span>
-    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
-    <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="s2">&quot;ElementID&quot;</span><span class="p">],</span>
+    <span class="n">client</span><span class="p">:</span> <span class="n">EPICSClient</span><span class="p">,</span>
+    <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">ElementID</span><span class="p">],</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">subshell</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -305,7 +304,6 @@
     <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
 
-    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">_resolve_element</span>
 
     <span class="c1"># Collect data: subshell -&gt; [(Z, BE)]</span>
     <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -342,8 +340,8 @@
 <div class="viewcode-block" id="plot_shell_binding_energies">
 <a class="viewcode-back" href="../../api.html#pyepics.plotting.plot_shell_binding_energies">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">plot_shell_binding_energies</span><span class="p">(</span>
-    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
-    <span class="n">element</span><span class="p">:</span> <span class="s2">&quot;ElementID&quot;</span><span class="p">,</span>
+    <span class="n">client</span><span class="p">:</span> <span class="n">EPICSClient</span><span class="p">,</span>
+    <span class="n">element</span><span class="p">:</span> <span class="n">ElementID</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

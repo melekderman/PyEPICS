@@ -163,7 +163,7 @@
     <span class="n">EPDLDataset</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetModel</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">SUBSHELL_LABELS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">ELECTRON_SUBSHELL_LABELS</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.parsing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">build_pdf</span><span class="p">,</span>
     <span class="n">linear_interpolation</span><span class="p">,</span>
@@ -330,7 +330,7 @@
     <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">ion_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_ion_total</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
     <span class="n">subs_grp</span> <span class="o">=</span> <span class="n">ion_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
 
-    <span class="k">for</span> <span class="n">mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">_mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">ELECTRON_SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="n">xs_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;xs_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="n">spec_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;spec_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
 
@@ -412,7 +412,7 @@
     <span class="n">pe_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;photoelectric&quot;</span><span class="p">)</span>
     <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">pe_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_photoelectric&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
     <span class="n">pe_subs</span> <span class="o">=</span> <span class="n">pe_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">_mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">ELECTRON_SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;xs_pe_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
             <span class="k">continue</span>
@@ -614,8 +614,8 @@
         <span class="p">)</span>
 
     <span class="c1"># Select reader</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eadl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EADLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.epdl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPDLReader</span>
 
     <span class="n">reader_map</span> <span class="o">=</span> <span class="p">{</span>
@@ -659,8 +659,8 @@
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_get_reader</span><span class="p">(</span><span class="n">dataset_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the correct reader class for a dataset type.&quot;&quot;&quot;</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eadl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EADLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.epdl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPDLReader</span>
     <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="n">EEDLReader</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="n">EADLReader</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="n">EPDLReader</span><span class="p">}[</span><span class="n">dataset_type</span><span class="p">]</span>
 
@@ -699,9 +699,9 @@
 <span class="sd">    &gt;&gt;&gt; create_raw_hdf5(&quot;EEDL&quot;, &quot;data/endf/eedl/EEDL.ZA026000.endf&quot;, &quot;data/raw/electron/Fe.h5&quot;)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.converters.raw_hdf5</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">write_raw_eadl</span><span class="p">,</span>
         <span class="n">write_raw_eedl</span><span class="p">,</span>
         <span class="n">write_raw_epdl</span><span class="p">,</span>
-        <span class="n">write_raw_eadl</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="n">writers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="n">write_raw_eedl</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="n">write_raw_epdl</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="n">write_raw_eadl</span><span class="p">}</span>
@@ -764,9 +764,9 @@
 <span class="sd">    &gt;&gt;&gt; create_mcdc_hdf5(&quot;EEDL&quot;, &quot;data/endf/eedl/EEDL.ZA026000.endf&quot;, &quot;data/mcdc/electron/Fe.h5&quot;)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.converters.mcdc_hdf5</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">write_mcdc_eadl</span><span class="p">,</span>
         <span class="n">write_mcdc_eedl</span><span class="p">,</span>
         <span class="n">write_mcdc_epdl</span><span class="p">,</span>
-        <span class="n">write_mcdc_eadl</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="n">writers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="n">write_mcdc_eedl</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="n">write_mcdc_epdl</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="n">write_mcdc_eadl</span><span class="p">}</span>

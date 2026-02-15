@@ -134,9 +134,9 @@
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseReader</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ELECTRON_SECTIONS_ABBREVS</span><span class="p">,</span>
+    <span class="n">ELECTRON_SUBSHELL_LABELS</span><span class="p">,</span>
     <span class="n">PERIODIC_TABLE</span><span class="p">,</span>
-    <span class="n">SECTIONS_ABBREVS</span><span class="p">,</span>
-    <span class="n">SUBSHELL_LABELS</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.parsing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">extract_atomic_number_from_path</span><span class="p">,</span>
@@ -252,7 +252,7 @@
         <span class="n">bremsstrahlung_spectra</span><span class="p">:</span> <span class="n">DistributionRecord</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="c1"># -- MF=23: Cross Sections ----------------------------------------</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">),</span> <span class="n">abbrev</span> <span class="ow">in</span> <span class="n">SECTIONS_ABBREVS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">),</span> <span class="n">abbrev</span> <span class="ow">in</span> <span class="n">ELECTRON_SECTIONS_ABBREVS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">mf</span> <span class="o">!=</span> <span class="mi">23</span> <span class="ow">or</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mat</span><span class="o">.</span><span class="n">section_data</span><span class="p">:</span>
                 <span class="k">continue</span>
 
@@ -279,7 +279,7 @@
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;  MF=23/MT=</span><span class="si">%d</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">): </span><span class="si">%d</span><span class="s2"> points&quot;</span><span class="p">,</span> <span class="n">mt</span><span class="p">,</span> <span class="n">abbrev</span><span class="p">,</span> <span class="n">energy</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
 
         <span class="c1"># -- MF=26: Distributions -----------------------------------------</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">),</span> <span class="n">abbrev</span> <span class="ow">in</span> <span class="n">SECTIONS_ABBREVS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">),</span> <span class="n">abbrev</span> <span class="ow">in</span> <span class="n">ELECTRON_SECTIONS_ABBREVS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">mf</span> <span class="o">!=</span> <span class="mi">26</span> <span class="ow">or</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mat</span><span class="o">.</span><span class="n">section_data</span><span class="p">:</span>
                 <span class="k">continue</span>
 
@@ -349,7 +349,7 @@
                         <span class="n">E_out</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;E&#39;&quot;</span><span class="p">,</span> <span class="p">[])</span>
                         <span class="n">b_raw</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)</span>
                         <span class="n">b_flat</span> <span class="o">=</span> <span class="n">b_raw</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span> <span class="k">if</span> <span class="n">b_raw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
-                        <span class="k">for</span> <span class="n">eo</span><span class="p">,</span> <span class="n">bb</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">E_out</span><span class="p">,</span> <span class="n">b_flat</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">eo</span><span class="p">,</span> <span class="n">bb</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">E_out</span><span class="p">,</span> <span class="n">b_flat</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
                             <span class="n">inc_e_arr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">E_inc</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
                             <span class="n">out_e_arr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">eo</span><span class="p">)</span>
                             <span class="n">b_arr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">bb</span><span class="p">))</span>
@@ -377,7 +377,7 @@
                     <span class="n">E_out</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;E&#39;&quot;</span><span class="p">,</span> <span class="p">[])</span>
                     <span class="n">b_raw</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)</span>
                     <span class="n">b_flat</span> <span class="o">=</span> <span class="n">b_raw</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span> <span class="k">if</span> <span class="n">b_raw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
-                    <span class="k">for</span> <span class="n">eo</span><span class="p">,</span> <span class="n">bb</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">E_out</span><span class="p">,</span> <span class="n">b_flat</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">eo</span><span class="p">,</span> <span class="n">bb</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">E_out</span><span class="p">,</span> <span class="n">b_flat</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
                         <span class="n">inc_e_arr2</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">E_inc</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
                         <span class="n">out_e_arr2</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">eo</span><span class="p">)</span>
                         <span class="n">b_arr2</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">bb</span><span class="p">))</span>
@@ -391,8 +391,8 @@
                     <span class="p">)</span>
 
                 <span class="c1"># Store binding energy from y_tab if available</span>
-                <span class="k">if</span> <span class="n">y_tab</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">mt</span> <span class="ow">in</span> <span class="n">SUBSHELL_LABELS</span><span class="p">:</span>
-                    <span class="n">shell_label</span> <span class="o">=</span> <span class="n">SUBSHELL_LABELS</span><span class="p">[</span><span class="n">mt</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">y_tab</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">mt</span> <span class="ow">in</span> <span class="n">ELECTRON_SUBSHELL_LABELS</span><span class="p">:</span>
+                    <span class="n">shell_label</span> <span class="o">=</span> <span class="n">ELECTRON_SUBSHELL_LABELS</span><span class="p">[</span><span class="n">mt</span><span class="p">]</span>
                     <span class="n">xs_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;xs_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
                     <span class="k">if</span> <span class="n">xs_key</span> <span class="ow">in</span> <span class="n">cross_sections</span><span class="p">:</span>
                         <span class="c1"># Attach binding energy as first y_tab energy point</span>
