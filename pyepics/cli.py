@@ -209,7 +209,7 @@ def cmd_mcdc(args):
     eadl_dir = base / LIBRARY_CONFIG["atomic"]["endf_dir"]
 
     print(f"\n{'=' * 60}")
-    print(f"  Creating combined MCDC HDF5 files")
+    print("  Creating combined MCDC HDF5 files")
     print(f"  Output:  {mcdc_dir}")
     print(f"  Z range: {z_min}–{z_max}")
     print(f"{'=' * 60}")
