@@ -1,0 +1,324 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyepics.readers.epdl &mdash; PyEPICS 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            PyEPICS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../data_sources.html">Data Sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">PyEPICS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyepics.readers.epdl</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyepics.readers.epdl</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) 2026 Melek Derman</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">EPDL (Evaluated Photon Data Library) reader</span>
+
+<span class="sd">Parses ENDF-format EPDL files and returns a strongly-typed</span>
+<span class="sd">:class:`~pyepics.models.records.EPDLDataset` instance.</span>
+
+<span class="sd">Supported ENDF sections</span>
+<span class="sd">-----------------------</span>
+<span class="sd">* **MF=23** — Photon cross sections (total, coherent, incoherent,</span>
+<span class="sd">  pair production, photoelectric, subshell photoelectric).</span>
+<span class="sd">* **MF=27** — Form factors and scattering functions (coherent form</span>
+<span class="sd">  factor, incoherent scattering function, anomalous scattering factors).</span>
+
+<span class="sd">File Format Assumptions</span>
+<span class="sd">-----------------------</span>
+<span class="sd">* Standard ENDF-6 fixed-width format (80 chars/line).</span>
+<span class="sd">* Parsed entirely via the ``endf`` Python package.</span>
+
+<span class="sd">References</span>
+<span class="sd">----------</span>
+<span class="sd">- ENDF-6 Formats Manual (ENDF-102, BNL-90365-2009 Rev. 2).</span>
+<span class="sd">- LLNL Nuclear Data — EPICS 2025, https://nuclear.llnl.gov/EPICS/</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">endf</span>
+<span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">_exc</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+        <span class="s2">&quot;The &#39;endf&#39; package is required by EPDLReader.  &quot;</span>
+        <span class="s2">&quot;Install it with: pip install endf&quot;</span>
+    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">_exc</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileFormatError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.models.records</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CrossSectionRecord</span><span class="p">,</span>
+    <span class="n">EPDLDataset</span><span class="p">,</span>
+    <span class="n">FormFactorRecord</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PERIODIC_TABLE</span><span class="p">,</span>
+    <span class="n">PHOTON_SECTIONS_ABBREVS</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.parsing</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract_atomic_number_from_path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.validation</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">validate_atomic_number</span><span class="p">,</span>
+    <span class="n">validate_cross_section</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="EPDLReader">
+<a class="viewcode-back" href="../../../api.html#pyepics.readers.epdl.EPDLReader">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EPDLReader</span><span class="p">(</span><span class="n">BaseReader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reader for EPDL (Evaluated Photon Data Library) ENDF files</span>
+
+<span class="sd">    Extracts photon interaction cross sections (MF=23) and form factors</span>
+<span class="sd">    (MF=27) from a single-element ENDF file generated by the LLNL EPICS</span>
+<span class="sd">    2025 pipeline.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    All parsing is done via ``endf.Material``.  The ``sigma`` attribute</span>
+<span class="sd">    of each section&#39;s ``Tabulated1D`` object is read for both MF=23 and</span>
+<span class="sd">    MF=27 data.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; reader = EPDLReader()</span>
+<span class="sd">    &gt;&gt;&gt; dataset = reader.read(&quot;epdl/EPDL.ZA026000.endf&quot;)</span>
+<span class="sd">    &gt;&gt;&gt; dataset.Z</span>
+<span class="sd">    26</span>
+<span class="sd">    &gt;&gt;&gt; &quot;xs_tot&quot; in dataset.cross_sections</span>
+<span class="sd">    True</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="EPDLReader.read">
+<a class="viewcode-back" href="../../../api.html#pyepics.readers.epdl.EPDLReader.read">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EPDLDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parse an EPDL ENDF file and return a typed dataset model</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path : Path | str</span>
+<span class="sd">            Path to the EPDL ENDF file.  The filename must contain</span>
+<span class="sd">            ``ZA{ZZZ}000``.</span>
+<span class="sd">        validate : bool, optional</span>
+<span class="sd">            Run post-parse validation.  Default ``True``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        EPDLDataset</span>
+<span class="sd">            Fully populated photon dataset model.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        FileFormatError</span>
+<span class="sd">            If the file is missing or cannot be parsed.</span>
+<span class="sd">        ParseError</span>
+<span class="sd">            If any ENDF section is malformed.</span>
+<span class="sd">        ValidationError</span>
+<span class="sd">            If validation is enabled and fails.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Opening EPDL file: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">filepath</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">FileFormatError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;EPDL file not found: </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">Z</span> <span class="o">=</span> <span class="n">extract_atomic_number_from_path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">validate</span><span class="p">:</span>
+            <span class="n">validate_atomic_number</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span>
+
+        <span class="n">entry</span> <span class="o">=</span> <span class="n">PERIODIC_TABLE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Z</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">symbol</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;symbol&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Z</span><span class="si">{</span><span class="n">Z</span><span class="si">:</span><span class="s2">03d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mat</span> <span class="o">=</span> <span class="n">endf</span><span class="o">.</span><span class="n">Material</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">filepath</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">FileFormatError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Failed to open </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2"> with endf library: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loaded ENDF material for Z=</span><span class="si">%d</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">,</span> <span class="n">symbol</span><span class="p">)</span>
+
+        <span class="c1"># Extract AWR / ZA</span>
+        <span class="n">awr</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">za</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">Z</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sec</span> <span class="ow">in</span> <span class="n">mat</span><span class="o">.</span><span class="n">section_data</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sec</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;AWR&quot;</span> <span class="ow">in</span> <span class="n">sec</span><span class="p">:</span>
+                <span class="n">awr</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sec</span><span class="p">[</span><span class="s2">&quot;AWR&quot;</span><span class="p">])</span>
+                <span class="n">za</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ZA&quot;</span><span class="p">,</span> <span class="n">za</span><span class="p">))</span>
+                <span class="k">break</span>
+
+        <span class="n">cross_sections</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">CrossSectionRecord</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">form_factors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">FormFactorRecord</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">),</span> <span class="n">abbrev</span> <span class="ow">in</span> <span class="n">PHOTON_SECTIONS_ABBREVS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mat</span><span class="o">.</span><span class="n">section_data</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">sec</span> <span class="o">=</span> <span class="n">mat</span><span class="o">.</span><span class="n">section_data</span><span class="p">[(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mt</span><span class="p">)]</span>
+            <span class="n">sigma</span> <span class="o">=</span> <span class="n">sec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sigma&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sigma</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sigma</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">)</span>
+            <span class="n">y_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sigma</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">)</span>
+            <span class="n">bps</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sigma</span><span class="o">.</span><span class="n">breakpoints</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">sigma</span><span class="o">.</span><span class="n">breakpoints</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">)</span>
+            <span class="n">interp</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sigma</span><span class="o">.</span><span class="n">interpolation</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">sigma</span><span class="o">.</span><span class="n">interpolation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">mf</span> <span class="o">==</span> <span class="mi">23</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">validate</span><span class="p">:</span>
+                    <span class="n">validate_cross_section</span><span class="p">(</span><span class="n">x_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">abbrev</span><span class="p">)</span>
+                <span class="n">cross_sections</span><span class="p">[</span><span class="n">abbrev</span><span class="p">]</span> <span class="o">=</span> <span class="n">CrossSectionRecord</span><span class="p">(</span>
+                    <span class="n">label</span><span class="o">=</span><span class="n">abbrev</span><span class="p">,</span>
+                    <span class="n">energy</span><span class="o">=</span><span class="n">x_arr</span><span class="p">,</span>
+                    <span class="n">cross_section</span><span class="o">=</span><span class="n">y_arr</span><span class="p">,</span>
+                    <span class="n">breakpoints</span><span class="o">=</span><span class="n">bps</span><span class="p">,</span>
+                    <span class="n">interpolation</span><span class="o">=</span><span class="n">interp</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;  MF=23/MT=</span><span class="si">%d</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">): </span><span class="si">%d</span><span class="s2"> points&quot;</span><span class="p">,</span> <span class="n">mt</span><span class="p">,</span> <span class="n">abbrev</span><span class="p">,</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">mf</span> <span class="o">==</span> <span class="mi">27</span><span class="p">:</span>
+                <span class="n">form_factors</span><span class="p">[</span><span class="n">abbrev</span><span class="p">]</span> <span class="o">=</span> <span class="n">FormFactorRecord</span><span class="p">(</span>
+                    <span class="n">label</span><span class="o">=</span><span class="n">abbrev</span><span class="p">,</span>
+                    <span class="n">x</span><span class="o">=</span><span class="n">x_arr</span><span class="p">,</span>
+                    <span class="n">y</span><span class="o">=</span><span class="n">y_arr</span><span class="p">,</span>
+                    <span class="n">breakpoints</span><span class="o">=</span><span class="n">bps</span><span class="p">,</span>
+                    <span class="n">interpolation</span><span class="o">=</span><span class="n">interp</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;  MF=27/MT=</span><span class="si">%d</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">): </span><span class="si">%d</span><span class="s2"> points&quot;</span><span class="p">,</span> <span class="n">mt</span><span class="p">,</span> <span class="n">abbrev</span><span class="p">,</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">EPDLDataset</span><span class="p">(</span>
+            <span class="n">Z</span><span class="o">=</span><span class="n">Z</span><span class="p">,</span>
+            <span class="n">symbol</span><span class="o">=</span><span class="n">symbol</span><span class="p">,</span>
+            <span class="n">atomic_weight_ratio</span><span class="o">=</span><span class="n">awr</span><span class="p">,</span>
+            <span class="n">ZA</span><span class="o">=</span><span class="n">za</span><span class="p">,</span>
+            <span class="n">cross_sections</span><span class="o">=</span><span class="n">cross_sections</span><span class="p">,</span>
+            <span class="n">form_factors</span><span class="o">=</span><span class="n">form_factors</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;EPDL parse complete for Z=</span><span class="si">%d</span><span class="s2">: </span><span class="si">%d</span><span class="s2"> xs, </span><span class="si">%d</span><span class="s2"> ff&quot;</span><span class="p">,</span>
+            <span class="n">Z</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">cross_sections</span><span class="p">),</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">form_factors</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Melek Derman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

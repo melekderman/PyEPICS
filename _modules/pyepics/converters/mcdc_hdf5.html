@@ -1,0 +1,522 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyepics.converters.mcdc_hdf5 &mdash; PyEPICS 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            PyEPICS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../data_sources.html">Data Sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">PyEPICS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyepics.converters.mcdc_hdf5</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyepics.converters.mcdc_hdf5</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) 2026 Melek Derman</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">MCDC-format HDF5 writer for EPICS datasets</span>
+
+<span class="sd">Writes HDF5 files optimised for the MC/DC (Monte Carlo / Dynamic Code)</span>
+<span class="sd">transport code.  These differ from the &quot;raw&quot; format in several ways:</span>
+
+<span class="sd">* All cross sections are **interpolated onto a common energy grid**.</span>
+<span class="sd">* Angular distributions are converted to (energy_grid, energy_offset,</span>
+<span class="sd">  value, PDF) compressed tables via :func:`~pyepics.utils.parsing.build_pdf`.</span>
+<span class="sd">* Small-angle elastic scattering cosine PDFs are **analytically computed**</span>
+<span class="sd">  from screened Rutherford via</span>
+<span class="sd">  :func:`~pyepics.utils.parsing.small_angle_scattering_cosine`.</span>
+<span class="sd">* Atomic relaxation transitions are split into radiative / non-radiative</span>
+<span class="sd">  groups with pre-computed fluorescence and Auger yields.</span>
+
+<span class="sd">.. important::</span>
+<span class="sd">   **This file is intentionally kept separate** from the raw HDF5 writer</span>
+<span class="sd">   so that the MCDC data layout can be changed frequently without</span>
+<span class="sd">   affecting the raw-data pipeline.  If the transport code changes its</span>
+<span class="sd">   expected input format, edit this file only.</span>
+
+<span class="sd">Output Directories</span>
+<span class="sd">------------------</span>
+<span class="sd">* ``data/mcdc/electron/``    — EEDL (electron)</span>
+<span class="sd">* ``data/mcdc/photon/``      — EPDL (photon)</span>
+<span class="sd">* ``data/mcdc/atomic/``      — EADL (atomic)</span>
+
+<span class="sd">See Also</span>
+<span class="sd">--------</span>
+<span class="sd">pyepics.converters.raw_hdf5 : raw (full-fidelity) writer</span>
+<span class="sd">pyepics.converters.hdf5      : high-level convenience API</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">_exc</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+        <span class="s2">&quot;The &#39;h5py&#39; package is required.  Install with: pip install h5py&quot;</span>
+    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">_exc</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.models.records</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">EADLDataset</span><span class="p">,</span>
+    <span class="n">EEDLDataset</span><span class="p">,</span>
+    <span class="n">EPDLDataset</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">SUBSHELL_LABELS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.parsing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">build_pdf</span><span class="p">,</span>
+    <span class="n">linear_interpolation</span><span class="p">,</span>
+    <span class="n">small_angle_scattering_cosine</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Helpers</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_create_xs_dataset</span><span class="p">(</span>
+    <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">,</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">units</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Dataset</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a float64 dataset with a ``units`` attribute.&quot;&quot;&quot;</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">))</span>
+    <span class="n">ds</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">units</span>
+    <span class="k">return</span> <span class="n">ds</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_mcdc_metadata</span><span class="p">(</span><span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write top-level metadata expected by MC/DC.&quot;&quot;&quot;</span>
+    <span class="n">h5f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;atomic_weight_ratio&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">atomic_weight_ratio</span><span class="p">))</span>
+    <span class="n">h5f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;atomic_number&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">Z</span><span class="p">))</span>
+    <span class="n">h5f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;element_name&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># EEDL MCDC writer</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="write_mcdc_eedl">
+<a class="viewcode-back" href="../../../api.html#pyepics.converters.mcdc_hdf5.write_mcdc_eedl">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">write_mcdc_eedl</span><span class="p">(</span><span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">EEDLDataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write an MCDC-format EEDL HDF5 file</span>
+
+<span class="sd">    All cross sections are resampled onto the total-xs energy grid.</span>
+<span class="sd">    Angular distributions are compressed into (grid, offset, value, PDF)</span>
+<span class="sd">    tables.  Small-angle elastic scattering cosine PDFs are computed</span>
+<span class="sd">    analytically from screened Rutherford theory.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    h5f : h5py.File</span>
+<span class="sd">        Open HDF5 file handle (write mode).</span>
+<span class="sd">    dataset : EEDLDataset</span>
+<span class="sd">        Parsed EEDL dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_write_mcdc_metadata</span><span class="p">(</span><span class="n">h5f</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+
+    <span class="n">Z</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">Z</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cross_sections</span>
+    <span class="n">dist</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">distributions</span>
+    <span class="n">ael</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">average_energy_losses</span>
+
+    <span class="k">if</span> <span class="s2">&quot;xs_tot&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No total cross section (xs_tot) for Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">root</span> <span class="o">=</span> <span class="n">h5f</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;electron_reactions&quot;</span><span class="p">)</span>
+    <span class="n">xs_energy_grid</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span>
+    <span class="n">total_xs</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span>
+
+    <span class="c1"># Interpolation helper</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">interp</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Interpolate cross-section *key* onto the common energy grid.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">linear_interpolation</span><span class="p">(</span>
+                <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xs_energy_grid</span><span class="p">)</span>
+
+    <span class="n">xs_sc_total</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_el&quot;</span><span class="p">)</span>
+    <span class="n">xs_sc_la</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_lge&quot;</span><span class="p">)</span>
+    <span class="n">xs_brem</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_brem&quot;</span><span class="p">)</span>
+    <span class="n">xs_exc</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_exc&quot;</span><span class="p">)</span>
+    <span class="n">xs_ion_total</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_ion&quot;</span><span class="p">)</span>
+    <span class="n">xs_sc_sa</span> <span class="o">=</span> <span class="n">xs_sc_total</span> <span class="o">-</span> <span class="n">xs_sc_la</span>
+
+    <span class="c1"># Common grid</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="s2">&quot;xs_energy_grid&quot;</span><span class="p">,</span> <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Total ---</span>
+    <span class="n">total_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;total&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">total_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">total_xs</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Elastic scattering ---</span>
+    <span class="n">es_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;elastic_scattering&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">es_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_sc_total</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Large angle</span>
+    <span class="n">la_grp</span> <span class="o">=</span> <span class="n">es_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;large_angle&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">la_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_sc_la</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;ang_lge&quot;</span> <span class="ow">in</span> <span class="n">dist</span><span class="p">:</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">dist</span><span class="p">[</span><span class="s2">&quot;ang_lge&quot;</span><span class="p">]</span>
+        <span class="n">eg</span><span class="p">,</span> <span class="n">off</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">PDF</span> <span class="o">=</span> <span class="n">build_pdf</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">inc_energy</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">probability</span><span class="p">)</span>
+        <span class="n">sc_grp</span> <span class="o">=</span> <span class="n">la_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;scattering_cosine&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sc_grp</span><span class="p">,</span> <span class="s2">&quot;energy_grid&quot;</span><span class="p">,</span> <span class="n">eg</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">sc_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;energy_offset&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">off</span><span class="p">)</span>
+        <span class="n">sc_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">val</span><span class="p">)</span>
+        <span class="n">sc_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;PDF&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">PDF</span><span class="p">)</span>
+
+    <span class="c1"># Small angle</span>
+    <span class="n">sa_grp</span> <span class="o">=</span> <span class="n">es_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;small_angle&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sa_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_sc_sa</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">mask_sa</span> <span class="o">=</span> <span class="n">xs_sc_sa</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">mask_sa</span><span class="p">):</span>
+        <span class="n">eg_sa</span><span class="p">,</span> <span class="n">off_sa</span><span class="p">,</span> <span class="n">val_sa</span><span class="p">,</span> <span class="n">pdf_sa</span> <span class="o">=</span> <span class="n">small_angle_scattering_cosine</span><span class="p">(</span>
+            <span class="n">Z</span><span class="p">,</span> <span class="n">xs_energy_grid</span><span class="p">[</span><span class="n">mask_sa</span><span class="p">],</span> <span class="n">n_mu</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sc_grp_sa</span> <span class="o">=</span> <span class="n">sa_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;scattering_cosine&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sc_grp_sa</span><span class="p">,</span> <span class="s2">&quot;energy_grid&quot;</span><span class="p">,</span> <span class="n">eg_sa</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">sc_grp_sa</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;energy_offset&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">off_sa</span><span class="p">)</span>
+        <span class="n">sc_grp_sa</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">val_sa</span><span class="p">)</span>
+        <span class="n">sc_grp_sa</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;PDF&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">pdf_sa</span><span class="p">)</span>
+
+    <span class="c1"># --- Bremsstrahlung ---</span>
+    <span class="n">brem_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;bremsstrahlung&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">brem_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_brem</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;loss_brem_spec&quot;</span> <span class="ow">in</span> <span class="n">ael</span><span class="p">:</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">ael</span><span class="p">[</span><span class="s2">&quot;loss_brem_spec&quot;</span><span class="p">]</span>
+        <span class="n">el_grp</span> <span class="o">=</span> <span class="n">brem_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;energy_loss&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;energy&quot;</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">avg_loss</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Excitation ---</span>
+    <span class="n">exc_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;excitation&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">exc_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_exc</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;loss_exc&quot;</span> <span class="ow">in</span> <span class="n">ael</span><span class="p">:</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">ael</span><span class="p">[</span><span class="s2">&quot;loss_exc&quot;</span><span class="p">]</span>
+        <span class="n">el_grp</span> <span class="o">=</span> <span class="n">exc_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;energy_loss&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;energy&quot;</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">avg_loss</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Ionization ---</span>
+    <span class="n">ion_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;ionization&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">ion_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_ion_total</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">subs_grp</span> <span class="o">=</span> <span class="n">ion_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">xs_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;xs_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">spec_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;spec_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="n">xs_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">shell_xs</span> <span class="o">=</span> <span class="n">linear_interpolation</span><span class="p">(</span>
+            <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">xs_key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">xs_key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sg</span> <span class="o">=</span> <span class="n">subs_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="n">shell_label</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sg</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">shell_xs</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Binding energy (last point of the shell xs energy grid)</span>
+        <span class="n">sg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+            <span class="s2">&quot;binding_energy&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="n">xs</span><span class="p">[</span><span class="n">xs_key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">spec_key</span> <span class="ow">in</span> <span class="n">dist</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">dist</span><span class="p">[</span><span class="n">spec_key</span><span class="p">]</span>
+            <span class="n">egp</span><span class="p">,</span> <span class="n">offp</span><span class="p">,</span> <span class="n">valp</span><span class="p">,</span> <span class="n">PDFp</span> <span class="o">=</span> <span class="n">build_pdf</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">inc_energy</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">probability</span><span class="p">)</span>
+            <span class="n">pg</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;product&quot;</span><span class="p">)</span>
+            <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">pg</span><span class="p">,</span> <span class="s2">&quot;energy_grid&quot;</span><span class="p">,</span> <span class="n">egp</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+            <span class="n">pg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;energy_offset&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">offp</span><span class="p">)</span>
+            <span class="n">pg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">valp</span><span class="p">)</span>
+            <span class="n">pg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;PDF&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">PDFp</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Wrote MCDC EEDL for Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># EPDL MCDC writer</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="write_mcdc_epdl">
+<a class="viewcode-back" href="../../../api.html#pyepics.converters.mcdc_hdf5.write_mcdc_epdl">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">write_mcdc_epdl</span><span class="p">(</span><span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">EPDLDataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write an MCDC-format EPDL HDF5 file</span>
+
+<span class="sd">    All cross sections are resampled onto the total-xs energy grid.</span>
+<span class="sd">    Form factors are stored as-is (no interpolation needed).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    h5f : h5py.File</span>
+<span class="sd">        Open HDF5 file handle (write mode).</span>
+<span class="sd">    dataset : EPDLDataset</span>
+<span class="sd">        Parsed EPDL dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_write_mcdc_metadata</span><span class="p">(</span><span class="n">h5f</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cross_sections</span>
+    <span class="n">ff</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">form_factors</span>
+
+    <span class="k">if</span> <span class="s2">&quot;xs_tot&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No total cross section for EPDL Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">Z</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">root</span> <span class="o">=</span> <span class="n">h5f</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;photon_reactions&quot;</span><span class="p">)</span>
+    <span class="n">xs_energy_grid</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">interp</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Interpolate cross-section *key* onto the common energy grid.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">linear_interpolation</span><span class="p">(</span>
+                <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xs_energy_grid</span><span class="p">)</span>
+
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="s2">&quot;xs_energy_grid&quot;</span><span class="p">,</span> <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Total</span>
+    <span class="n">tot_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;total&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">tot_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Coherent scattering</span>
+    <span class="n">coh_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;coherent_scattering&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">coh_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_coherent&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;ff_coherent&quot;</span> <span class="ow">in</span> <span class="n">ff</span><span class="p">:</span>
+        <span class="n">ffg</span> <span class="o">=</span> <span class="n">coh_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;form_factor&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">ffg</span><span class="p">,</span> <span class="s2">&quot;momentum_transfer&quot;</span><span class="p">,</span> <span class="n">ff</span><span class="p">[</span><span class="s2">&quot;ff_coherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="s2">&quot;1/angstrom&quot;</span><span class="p">)</span>
+        <span class="n">ffg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">ff</span><span class="p">[</span><span class="s2">&quot;ff_coherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+
+    <span class="c1"># Incoherent scattering</span>
+    <span class="n">inc_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;incoherent_scattering&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">inc_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_incoherent&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;sf_incoherent&quot;</span> <span class="ow">in</span> <span class="n">ff</span><span class="p">:</span>
+        <span class="n">sfg</span> <span class="o">=</span> <span class="n">inc_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;scattering_function&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sfg</span><span class="p">,</span> <span class="s2">&quot;momentum_transfer&quot;</span><span class="p">,</span> <span class="n">ff</span><span class="p">[</span><span class="s2">&quot;sf_incoherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="s2">&quot;1/angstrom&quot;</span><span class="p">)</span>
+        <span class="n">sfg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">ff</span><span class="p">[</span><span class="s2">&quot;sf_incoherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+
+    <span class="c1"># Photoelectric</span>
+    <span class="n">pe_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;photoelectric&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">pe_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_photoelectric&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">pe_subs</span> <span class="o">=</span> <span class="n">pe_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;xs_pe_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">sg</span> <span class="o">=</span> <span class="n">pe_subs</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="n">shell_label</span><span class="p">)</span>
+        <span class="n">shell_xs</span> <span class="o">=</span> <span class="n">linear_interpolation</span><span class="p">(</span>
+            <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sg</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">shell_xs</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Pair production</span>
+    <span class="n">pp_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;pair_production&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">pp_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_pair_total&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">nuc_grp</span> <span class="o">=</span> <span class="n">pp_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;nuclear&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">nuc_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_pair_nuclear&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">ele_grp</span> <span class="o">=</span> <span class="n">pp_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;electron&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">ele_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_pair_electron&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Wrote MCDC EPDL for Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">Z</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># EADL MCDC writer</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="write_mcdc_eadl">
+<a class="viewcode-back" href="../../../api.html#pyepics.converters.mcdc_hdf5.write_mcdc_eadl">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">write_mcdc_eadl</span><span class="p">(</span><span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">EADLDataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write an MCDC-format EADL HDF5 file</span>
+
+<span class="sd">    Splits transitions into radiative / non-radiative groups with</span>
+<span class="sd">    pre-computed fluorescence and Auger yields.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    h5f : h5py.File</span>
+<span class="sd">        Open HDF5 file handle (write mode).</span>
+<span class="sd">    dataset : EADLDataset</span>
+<span class="sd">        Parsed EADL dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_write_mcdc_metadata</span><span class="p">(</span><span class="n">h5f</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+
+    <span class="n">root</span> <span class="o">=</span> <span class="n">h5f</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;atomic_relaxation&quot;</span><span class="p">)</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;n_subshells&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">n_subshells</span><span class="p">))</span>
+
+    <span class="n">binding_energies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">n_electrons_arr</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">subs_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">shell</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">subshells</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">binding_energies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">binding_energy_eV</span><span class="p">)</span>
+        <span class="n">n_electrons_arr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">n_electrons</span><span class="p">)</span>
+
+        <span class="n">sg</span> <span class="o">=</span> <span class="n">subs_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">ds_be</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;binding_energy_eV&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">shell</span><span class="o">.</span><span class="n">binding_energy_eV</span><span class="p">)</span>
+        <span class="n">ds_be</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+        <span class="n">sg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;n_electrons&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">shell</span><span class="o">.</span><span class="n">n_electrons</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">shell</span><span class="o">.</span><span class="n">transitions</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">rad_trans</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">shell</span><span class="o">.</span><span class="n">transitions</span> <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">is_radiative</span><span class="p">]</span>
+        <span class="n">auger_trans</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">shell</span><span class="o">.</span><span class="n">transitions</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">t</span><span class="o">.</span><span class="n">is_radiative</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">rad_trans</span><span class="p">:</span>
+            <span class="n">rg</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;radiative&quot;</span><span class="p">)</span>
+            <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;origin_designator&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">origin_designator</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;i4&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span> <span class="o">=</span> <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;energy_eV&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">energy_eV</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+            <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;probability&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">fy</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">)</span>
+            <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;fluorescence_yield&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="n">fy</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">auger_trans</span><span class="p">:</span>
+            <span class="n">ag</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;non_radiative&quot;</span><span class="p">)</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;origin_designator&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">origin_designator</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;i4&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;secondary_designator&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">secondary_designator</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;i4&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span> <span class="o">=</span> <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;energy_eV&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">energy_eV</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;probability&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ay</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">)</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;auger_yield&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="n">ay</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">binding_energies</span><span class="p">:</span>
+        <span class="n">ds_be</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+            <span class="s2">&quot;binding_energies_eV&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">binding_energies</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">ds_be</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+        <span class="n">root</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+            <span class="s2">&quot;n_electrons&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n_electrons_arr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Wrote MCDC EADL for Z=</span><span class="si">%d</span><span class="s2"> (</span><span class="si">%d</span><span class="s2"> subshells)&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">Z</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">n_subshells</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Melek Derman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,233 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyepics.exceptions &mdash; PyEPICS 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            PyEPICS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../data_sources.html">Data Sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">PyEPICS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyepics.exceptions</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyepics.exceptions</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) 2026 Melek Derman</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Custom exception hierarchy for the PyEPICS package</span>
+
+<span class="sd">All exceptions raised by PyEPICS inherit from :class:`PyEPICSError`, making it</span>
+<span class="sd">possible to catch every library-specific error with a single ``except`` clause</span>
+<span class="sd">while still allowing fine-grained handling when needed.</span>
+
+<span class="sd">Exception Hierarchy</span>
+<span class="sd">-------------------</span>
+<span class="sd">::</span>
+
+<span class="sd">    PyEPICSError</span>
+<span class="sd">    ├── ParseError          # Malformed file content</span>
+<span class="sd">    ├── ValidationError     # Failed format or range checks</span>
+<span class="sd">    ├── FileFormatError     # Wrong file type or header</span>
+<span class="sd">    ├── ConversionError     # HDF5 write failures</span>
+<span class="sd">    └── DownloadError       # Network errors (future)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+
+<div class="viewcode-block" id="PyEPICSError">
+<a class="viewcode-back" href="../../api.html#pyepics.exceptions.PyEPICSError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyEPICSError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base exception for all PyEPICS errors</span>
+
+<span class="sd">    Every exception raised by PyEPICS is a subclass of this type.</span>
+<span class="sd">    Catching ``PyEPICSError`` therefore catches any library-specific failure</span>
+<span class="sd">    while still allowing standard Python exceptions (``KeyError``,</span>
+<span class="sd">    ``TypeError``, etc.) to propagate normally.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ParseError">
+<a class="viewcode-back" href="../../api.html#pyepics.exceptions.ParseError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ParseError</span><span class="p">(</span><span class="n">PyEPICSError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when an ENDF-format file contains malformed or unparseable content</span>
+
+<span class="sd">    This includes unexpected column widths, non-numeric data in numeric</span>
+<span class="sd">    fields, truncated records, or any deviation from the ENDF-6 fixed-width</span>
+<span class="sd">    format that prevents successful extraction of physical data.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    message : str</span>
+<span class="sd">        Human-readable description of the parse failure, including the</span>
+<span class="sd">        file path and approximate line number when available.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ValidationError">
+<a class="viewcode-back" href="../../api.html#pyepics.exceptions.ValidationError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ValidationError</span><span class="p">(</span><span class="n">PyEPICSError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when parsed data fails post-parse validation checks</span>
+
+<span class="sd">    Validation checks include energy monotonicity, non-negative cross</span>
+<span class="sd">    sections, probability normalization, and physically meaningful</span>
+<span class="sd">    atomic-number ranges.  A ``ValidationError`` means the file was</span>
+<span class="sd">    *parseable* but the resulting data violates expected constraints.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    message : str</span>
+<span class="sd">        Description of the failed check, including the field name,</span>
+<span class="sd">        expected constraint, and actual value.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="FileFormatError">
+<a class="viewcode-back" href="../../api.html#pyepics.exceptions.FileFormatError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FileFormatError</span><span class="p">(</span><span class="n">PyEPICSError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when a file does not match the expected EPICS/ENDF format</span>
+
+<span class="sd">    This is raised *before* full parsing begins—for example when the</span>
+<span class="sd">    filename pattern does not match ``ZA{ZZZ}000`` or when the file</span>
+<span class="sd">    cannot be opened with the ``endf`` library.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    message : str</span>
+<span class="sd">        Description of the format mismatch, including the expected</span>
+<span class="sd">        pattern and actual file characteristics.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ConversionError">
+<a class="viewcode-back" href="../../api.html#pyepics.exceptions.ConversionError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ConversionError</span><span class="p">(</span><span class="n">PyEPICSError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when HDF5 conversion fails</span>
+
+<span class="sd">    This covers any error during HDF5 file creation: permission denied,</span>
+<span class="sd">    disk full, incompatible dataset shapes, or a missing prerequisite</span>
+<span class="sd">    dataset that should have been written in an earlier step.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    message : str</span>
+<span class="sd">        Description of the conversion failure and the target HDF5 path.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="DownloadError">
+<a class="viewcode-back" href="../../api.html#pyepics.exceptions.DownloadError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DownloadError</span><span class="p">(</span><span class="n">PyEPICSError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when dataset download from LLNL fails</span>
+
+<span class="sd">    Reserved for future use by the ``io.download`` module.  Covers HTTP</span>
+<span class="sd">    errors, connection timeouts, and checksum mismatches.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    message : str</span>
+<span class="sd">        Description of the network failure, including the URL attempted.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Melek Derman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

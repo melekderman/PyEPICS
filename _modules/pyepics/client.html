@@ -1,0 +1,752 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyepics.client &mdash; PyEPICS 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            PyEPICS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../data_sources.html">Data Sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">PyEPICS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyepics.client</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyepics.client</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) 2026 Melek Derman</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">High-level user API for querying element properties</span>
+
+<span class="sd">This module provides a convenient, user-friendly interface to query,</span>
+<span class="sd">compare, and visualise atomic / electron / photon properties from the</span>
+<span class="sd">EPICS (EEDL / EPDL / EADL) datasets.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">&gt;&gt;&gt; from pyepics.client import EPICSClient</span>
+<span class="sd">&gt;&gt;&gt; client = EPICSClient(&quot;data/endf&quot;)</span>
+<span class="sd">&gt;&gt;&gt; props = client.get_properties(&quot;Fe&quot;)</span>
+<span class="sd">&gt;&gt;&gt; props[&quot;Z&quot;]</span>
+<span class="sd">26</span>
+<span class="sd">&gt;&gt;&gt; df = client.compare([&quot;Fe&quot;, &quot;Cu&quot;, &quot;Au&quot;], properties=[&quot;Z&quot;, &quot;binding_energies&quot;])</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">PyEPICSError</span><span class="p">,</span> <span class="n">ValidationError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.models.records</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">EADLDataset</span><span class="p">,</span>
+    <span class="n">EEDLDataset</span><span class="p">,</span>
+    <span class="n">EPDLDataset</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eadl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EADLReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.epdl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPDLReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">PERIODIC_TABLE</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Type alias for element identifiers</span>
+<span class="n">ElementID</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Internal helpers</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">_SYMBOL_TO_Z</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">v</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span> <span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">PERIODIC_TABLE</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<span class="p">}</span>
+<span class="n">_NAME_TO_Z</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">v</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span> <span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">PERIODIC_TABLE</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolve_element</span><span class="p">(</span><span class="n">element</span><span class="p">:</span> <span class="n">ElementID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve an element identifier to (Z, symbol).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    element : int or str</span>
+<span class="sd">        Atomic number, element symbol (case-insensitive), or element name.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple[int, str]</span>
+<span class="sd">        ``(Z, symbol)``</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValidationError</span>
+<span class="sd">        If the element cannot be resolved.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">)):</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">z</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">PERIODIC_TABLE</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Atomic number Z=</span><span class="si">{</span><span class="n">z</span><span class="si">}</span><span class="s2"> is outside the valid range [1, 118].&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">z</span><span class="p">,</span> <span class="n">PERIODIC_TABLE</span><span class="p">[</span><span class="n">z</span><span class="p">][</span><span class="s2">&quot;symbol&quot;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="c1"># Try symbol first</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_SYMBOL_TO_Z</span><span class="p">:</span>
+            <span class="n">z</span> <span class="o">=</span> <span class="n">_SYMBOL_TO_Z</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">z</span><span class="p">,</span> <span class="n">PERIODIC_TABLE</span><span class="p">[</span><span class="n">z</span><span class="p">][</span><span class="s2">&quot;symbol&quot;</span><span class="p">]</span>
+        <span class="c1"># Try full name</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_NAME_TO_Z</span><span class="p">:</span>
+            <span class="n">z</span> <span class="o">=</span> <span class="n">_NAME_TO_Z</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">z</span><span class="p">,</span> <span class="n">PERIODIC_TABLE</span><span class="p">[</span><span class="n">z</span><span class="p">][</span><span class="s2">&quot;symbol&quot;</span><span class="p">]</span>
+        <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown element identifier: </span><span class="si">{</span><span class="n">element</span><span class="si">!r}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Provide an atomic number (1–118), symbol (e.g. &#39;Fe&#39;), &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;or element name (e.g. &#39;Iron&#39;).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Element must be an int or str, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">element</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.&quot;</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_endf_file</span><span class="p">(</span>
+    <span class="n">data_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">library</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="nb">int</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Locate an ENDF file for the given library and atomic number.&quot;&quot;&quot;</span>
+    <span class="n">lib_upper</span> <span class="o">=</span> <span class="n">library</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="n">subdir_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="s2">&quot;eedl&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="s2">&quot;epdl&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="s2">&quot;eadl&quot;</span><span class="p">}</span>
+    <span class="n">subdir</span> <span class="o">=</span> <span class="n">subdir_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">lib_upper</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subdir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">folder</span> <span class="o">=</span> <span class="n">data_dir</span> <span class="o">/</span> <span class="n">subdir</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">folder</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="c1"># Pattern: EEDL.ZA026000.endf</span>
+    <span class="n">za_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">z</span><span class="si">:</span><span class="s2">03d</span><span class="si">}</span><span class="s2">000&quot;</span>
+    <span class="n">fname</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">lib_upper</span><span class="si">}</span><span class="s2">.ZA</span><span class="si">{</span><span class="n">za_str</span><span class="si">}</span><span class="s2">.endf&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">folder</span> <span class="o">/</span> <span class="n">fname</span>
+    <span class="k">return</span> <span class="n">path</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Element result container</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="ElementProperties">
+<a class="viewcode-back" href="../../api.html#pyepics.client.ElementProperties">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ElementProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Container for all properties of a single element.</span>
+
+<span class="sd">    This object behaves like a dictionary but also provides attribute</span>
+<span class="sd">    access for convenience.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    Z : int</span>
+<span class="sd">        Atomic number.</span>
+<span class="sd">    symbol : str</span>
+<span class="sd">        Element symbol.</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Element name.</span>
+<span class="sd">    electron : EEDLDataset or None</span>
+<span class="sd">        Parsed EEDL data (if available).</span>
+<span class="sd">    photon : EPDLDataset or None</span>
+<span class="sd">        Parsed EPDL data (if available).</span>
+<span class="sd">    atomic : EADLDataset or None</span>
+<span class="sd">        Parsed EADL data (if available).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">z</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">electron</span><span class="p">:</span> <span class="n">EEDLDataset</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">photon</span><span class="p">:</span> <span class="n">EPDLDataset</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">atomic</span><span class="p">:</span> <span class="n">EADLDataset</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Z</span> <span class="o">=</span> <span class="n">z</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">symbol</span> <span class="o">=</span> <span class="n">symbol</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">electron</span> <span class="o">=</span> <span class="n">electron</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">photon</span> <span class="o">=</span> <span class="n">photon</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span> <span class="o">=</span> <span class="n">atomic</span>
+
+    <span class="c1"># -- Derived scalar helpers --</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">binding_energies</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Subshell binding energies (eV) from EADL data.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict[str, float]</span>
+<span class="sd">            Mapping of subshell label → binding energy.  Empty if no</span>
+<span class="sd">            EADL data is loaded.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="n">sub</span><span class="o">.</span><span class="n">binding_energy_eV</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span><span class="o">.</span><span class="n">subshells</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">electron_cross_section_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;List of available electron cross-section keys.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">electron</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">electron</span><span class="o">.</span><span class="n">cross_sections</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">photon_cross_section_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;List of available photon cross-section keys.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">photon</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">photon</span><span class="o">.</span><span class="n">cross_sections</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">subshells</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;List of subshell labels from EADL data.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atomic</span><span class="o">.</span><span class="n">subshells</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">n_subshells</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of subshells from EADL data.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span><span class="o">.</span><span class="n">n_subshells</span>
+
+<div class="viewcode-block" id="ElementProperties.to_dict">
+<a class="viewcode-back" href="../../api.html#pyepics.client.ElementProperties.to_dict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Export a flat summary dictionary.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict[str, Any]</span>
+<span class="sd">            Includes scalar metadata, binding energies, and lists of</span>
+<span class="sd">            available cross-section keys.  Array data is *not* included</span>
+<span class="sd">            to keep the output concise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">d</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;Z&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">Z</span><span class="p">,</span>
+            <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbol</span><span class="p">,</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="s2">&quot;n_subshells&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_subshells</span><span class="p">,</span>
+            <span class="s2">&quot;binding_energies&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">binding_energies</span><span class="p">,</span>
+            <span class="s2">&quot;electron_cross_sections&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">electron_cross_section_labels</span><span class="p">,</span>
+            <span class="s2">&quot;photon_cross_sections&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">photon_cross_section_labels</span><span class="p">,</span>
+            <span class="s2">&quot;subshells&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">subshells</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">electron</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">d</span><span class="p">[</span><span class="s2">&quot;atomic_weight_ratio&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">electron</span><span class="o">.</span><span class="n">atomic_weight_ratio</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">photon</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">d</span><span class="p">[</span><span class="s2">&quot;atomic_weight_ratio&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">photon</span><span class="o">.</span><span class="n">atomic_weight_ratio</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">d</span><span class="p">[</span><span class="s2">&quot;atomic_weight_ratio&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span><span class="o">.</span><span class="n">atomic_weight_ratio</span>
+        <span class="k">return</span> <span class="n">d</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">libs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">electron</span><span class="p">:</span>
+            <span class="n">libs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;EEDL&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">photon</span><span class="p">:</span>
+            <span class="n">libs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;EPDL&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">atomic</span><span class="p">:</span>
+            <span class="n">libs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;EADL&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;ElementProperties(Z=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">Z</span><span class="si">}</span><span class="s2">, symbol=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">symbol</span><span class="si">!r}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;name=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">, libraries=[</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">libs</span><span class="p">)</span><span class="si">}</span><span class="s2">])&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Main client</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="EPICSClient">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EPICSClient</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;High-level interface for querying EPICS element data.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    data_dir : str or Path</span>
+<span class="sd">        Root directory containing ``eedl/``, ``epdl/``, ``eadl/``</span>
+<span class="sd">        sub-folders with ENDF files.  Defaults to ``&quot;data/endf&quot;``</span>
+<span class="sd">        relative to the current working directory.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; client = EPICSClient(&quot;data/endf&quot;)</span>
+<span class="sd">    &gt;&gt;&gt; fe = client.get_element(&quot;Fe&quot;)</span>
+<span class="sd">    &gt;&gt;&gt; fe.Z</span>
+<span class="sd">    26</span>
+<span class="sd">    &gt;&gt;&gt; fe.binding_energies  # doctest: +SKIP</span>
+<span class="sd">    {&#39;K&#39;: 7112.0, &#39;L1&#39;: 844.6, ...}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">=</span> <span class="s2">&quot;data/endf&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_eedl_reader</span> <span class="o">=</span> <span class="n">EEDLReader</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_epdl_reader</span> <span class="o">=</span> <span class="n">EPDLReader</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_eadl_reader</span> <span class="o">=</span> <span class="n">EADLReader</span><span class="p">()</span>
+        <span class="c1"># Cache: Z -&gt; (eedl, epdl, eadl)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span>
+            <span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EEDLDataset</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">EPDLDataset</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">EADLDataset</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># -- Internal loading --</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">libraries</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">)</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EEDLDataset</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">EPDLDataset</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">EADLDataset</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load and cache datasets for element *z*.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">z</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span>
+            <span class="n">cached</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="n">z</span><span class="p">]</span>
+            <span class="c1"># If all requested libraries are already cached, return</span>
+            <span class="n">eedl</span><span class="p">,</span> <span class="n">epdl</span><span class="p">,</span> <span class="n">eadl</span> <span class="o">=</span> <span class="n">cached</span>
+            <span class="n">need_eedl</span> <span class="o">=</span> <span class="s2">&quot;EEDL&quot;</span> <span class="ow">in</span> <span class="n">libraries</span> <span class="ow">and</span> <span class="n">eedl</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="n">need_epdl</span> <span class="o">=</span> <span class="s2">&quot;EPDL&quot;</span> <span class="ow">in</span> <span class="n">libraries</span> <span class="ow">and</span> <span class="n">epdl</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="n">need_eadl</span> <span class="o">=</span> <span class="s2">&quot;EADL&quot;</span> <span class="ow">in</span> <span class="n">libraries</span> <span class="ow">and</span> <span class="n">eadl</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">need_eedl</span> <span class="ow">or</span> <span class="n">need_epdl</span> <span class="ow">or</span> <span class="n">need_eadl</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">cached</span>
+            <span class="c1"># Otherwise, load missing ones</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">eedl</span><span class="p">,</span> <span class="n">epdl</span><span class="p">,</span> <span class="n">eadl</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+        <span class="n">lib_upper</span> <span class="o">=</span> <span class="p">{</span><span class="n">lib</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="k">for</span> <span class="n">lib</span> <span class="ow">in</span> <span class="n">libraries</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="s2">&quot;EEDL&quot;</span> <span class="ow">in</span> <span class="n">lib_upper</span> <span class="ow">and</span> <span class="n">eedl</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">_find_endf_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_dir</span><span class="p">,</span> <span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">eedl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eedl_reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to read EEDL for Z=</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;EPDL&quot;</span> <span class="ow">in</span> <span class="n">lib_upper</span> <span class="ow">and</span> <span class="n">epdl</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">_find_endf_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_dir</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">epdl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_epdl_reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to read EPDL for Z=</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;EADL&quot;</span> <span class="ow">in</span> <span class="n">lib_upper</span> <span class="ow">and</span> <span class="n">eadl</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">_find_endf_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_dir</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">eadl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eadl_reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to read EADL for Z=</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">(</span><span class="n">eedl</span><span class="p">,</span> <span class="n">epdl</span><span class="p">,</span> <span class="n">eadl</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="n">z</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="c1"># -- Public API --</span>
+
+<div class="viewcode-block" id="EPICSClient.get_element">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient.get_element">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_element</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">element</span><span class="p">:</span> <span class="n">ElementID</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">libraries</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ElementProperties</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve all available data for an element.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        element : int or str</span>
+<span class="sd">            Atomic number, symbol (e.g. ``&quot;Fe&quot;``), or full name</span>
+<span class="sd">            (e.g. ``&quot;Iron&quot;``).</span>
+<span class="sd">        libraries : sequence of str, optional</span>
+<span class="sd">            Which EPICS libraries to load.  Defaults to all three.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ElementProperties</span>
+<span class="sd">            Container with parsed datasets and derived properties.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValidationError</span>
+<span class="sd">            If *element* cannot be resolved.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; client = EPICSClient(&quot;data/endf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; fe = client.get_element(&quot;Fe&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; fe.symbol</span>
+<span class="sd">        &#39;Fe&#39;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">z</span><span class="p">,</span> <span class="n">symbol</span> <span class="o">=</span> <span class="n">_resolve_element</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">PERIODIC_TABLE</span><span class="p">[</span><span class="n">z</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="n">eedl</span><span class="p">,</span> <span class="n">epdl</span><span class="p">,</span> <span class="n">eadl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_load</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="n">libraries</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ElementProperties</span><span class="p">(</span>
+            <span class="n">z</span><span class="p">,</span> <span class="n">symbol</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">electron</span><span class="o">=</span><span class="n">eedl</span><span class="p">,</span> <span class="n">photon</span><span class="o">=</span><span class="n">epdl</span><span class="p">,</span> <span class="n">atomic</span><span class="o">=</span><span class="n">eadl</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="EPICSClient.get_properties">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient.get_properties">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_properties</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">element</span><span class="p">:</span> <span class="n">ElementID</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">libraries</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a flat summary dictionary for an element.</span>
+
+<span class="sd">        This is a convenience wrapper around :meth:`get_element` that</span>
+<span class="sd">        returns a plain ``dict`` rather than an :class:`ElementProperties`</span>
+<span class="sd">        object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        element : int or str</span>
+<span class="sd">            Element identifier.</span>
+<span class="sd">        libraries : sequence of str, optional</span>
+<span class="sd">            Libraries to load.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict[str, Any]</span>
+<span class="sd">            See :meth:`ElementProperties.to_dict`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_element</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="n">libraries</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="EPICSClient.compare">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient.compare">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">ElementID</span><span class="p">],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">properties</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">libraries</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compare properties across multiple elements.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        elements : sequence of int or str</span>
+<span class="sd">            Elements to compare.</span>
+<span class="sd">        properties : sequence of str or None, optional</span>
+<span class="sd">            If given, only include these keys in each row.</span>
+<span class="sd">            Defaults to all scalar properties.</span>
+<span class="sd">        libraries : sequence of str, optional</span>
+<span class="sd">            Libraries to load.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[dict[str, Any]]</span>
+<span class="sd">            One dict per element.  If ``pandas`` is available, call</span>
+<span class="sd">            :meth:`compare_df` instead for a DataFrame.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; client = EPICSClient(&quot;data/endf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; rows = client.compare([&quot;H&quot;, &quot;He&quot;, &quot;Li&quot;])</span>
+<span class="sd">        &gt;&gt;&gt; [r[&quot;symbol&quot;] for r in rows]</span>
+<span class="sd">        [&#39;H&#39;, &#39;He&#39;, &#39;Li&#39;]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_properties</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="n">libraries</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">properties</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">d</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">d</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">properties</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">d</span><span class="p">}</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rows</span></div>
+
+
+<div class="viewcode-block" id="EPICSClient.compare_df">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient.compare_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compare_df</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">ElementID</span><span class="p">],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">properties</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">libraries</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">),</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compare elements and return a pandas DataFrame.</span>
+
+<span class="sd">        Requires ``pandas`` to be installed.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        elements : sequence of int or str</span>
+<span class="sd">            Elements to compare.</span>
+<span class="sd">        properties : sequence of str or None, optional</span>
+<span class="sd">            Subset of properties to include.</span>
+<span class="sd">        libraries : sequence of str, optional</span>
+<span class="sd">            Libraries to load.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            One row per element, columns are property names.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ImportError</span>
+<span class="sd">            If ``pandas`` is not installed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+                <span class="s2">&quot;pandas is required for compare_df(). &quot;</span>
+                <span class="s2">&quot;Install it with: pip install pandas&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span>
+            <span class="n">elements</span><span class="p">,</span> <span class="n">properties</span><span class="o">=</span><span class="n">properties</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="n">libraries</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="EPICSClient.binding_energy_table">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient.binding_energy_table">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">binding_energy_table</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">ElementID</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a binding-energy table (requires pandas).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        elements : sequence of int or str</span>
+<span class="sd">            Elements to include.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            Rows = elements, columns = subshell labels.</span>
+<span class="sd">            Missing subshells are ``NaN``.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ImportError</span>
+<span class="sd">            If ``pandas`` is not installed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+                <span class="s2">&quot;pandas is required for binding_energy_table(). &quot;</span>
+                <span class="s2">&quot;Install it with: pip install pandas&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+        <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">:</span>
+            <span class="n">ep</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_element</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;EADL&quot;</span><span class="p">])</span>
+            <span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Z&quot;</span><span class="p">:</span> <span class="n">ep</span><span class="o">.</span><span class="n">Z</span><span class="p">,</span> <span class="s2">&quot;symbol&quot;</span><span class="p">:</span> <span class="n">ep</span><span class="o">.</span><span class="n">symbol</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">}</span>
+            <span class="n">row</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ep</span><span class="o">.</span><span class="n">binding_energies</span><span class="p">)</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">records</span><span class="p">)</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;symbol&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="EPICSClient.get_cross_section">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient.get_cross_section">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_cross_section</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">element</span><span class="p">:</span> <span class="n">ElementID</span><span class="p">,</span>
+        <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">library</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;EEDL&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve a specific cross-section array.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        element : int or str</span>
+<span class="sd">            Element identifier.</span>
+<span class="sd">        label : str</span>
+<span class="sd">            Cross-section label (e.g. ``&quot;xs_tot&quot;``).</span>
+<span class="sd">        library : str</span>
+<span class="sd">            ``&quot;EEDL&quot;`` or ``&quot;EPDL&quot;``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        tuple[numpy.ndarray, numpy.ndarray]</span>
+<span class="sd">            ``(energy_eV, cross_section_barns)``</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If the label does not exist for this element.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ep</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_element</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="p">[</span><span class="n">library</span><span class="p">])</span>
+        <span class="n">lib_upper</span> <span class="o">=</span> <span class="n">library</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">lib_upper</span> <span class="o">==</span> <span class="s2">&quot;EEDL&quot;</span><span class="p">:</span>
+            <span class="n">ds</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">electron</span>
+        <span class="k">elif</span> <span class="n">lib_upper</span> <span class="o">==</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span>
+            <span class="n">ds</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">photon</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Cross sections are only in EEDL/EPDL, not </span><span class="si">{</span><span class="n">library</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">ds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">PyEPICSError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No </span><span class="si">{</span><span class="n">lib_upper</span><span class="si">}</span><span class="s2"> data found for </span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2"> (Z=</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">Z</span><span class="si">}</span><span class="s2">). &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Check that the ENDF files exist in </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_dir</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">label</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">cross_sections</span><span class="p">:</span>
+            <span class="n">available</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">cross_sections</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Cross-section label </span><span class="si">{</span><span class="n">label</span><span class="si">!r}</span><span class="s2"> not found for &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2">. Available: </span><span class="si">{</span><span class="n">available</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">rec</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">cross_sections</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">rec</span><span class="o">.</span><span class="n">energy</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span> <span class="n">rec</span><span class="o">.</span><span class="n">cross_section</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+    <span class="c1"># -- Cache management --</span>
+
+<div class="viewcode-block" id="EPICSClient.clear_cache">
+<a class="viewcode-back" href="../../api.html#pyepics.client.EPICSClient.clear_cache">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Clear all cached datasets.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">available_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return sorted list of atomic numbers with ENDF data on disk.</span>
+
+<span class="sd">        Scans the data directory for EEDL files (as the primary indicator).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">eedl_dir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_dir</span> <span class="o">/</span> <span class="s2">&quot;eedl&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">eedl_dir</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="n">zs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">eedl_dir</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">&quot;.endf&quot;</span> <span class="ow">and</span> <span class="n">f</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;EEDL.ZA&quot;</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">za_part</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;ZA&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">z</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">za_part</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
+                    <span class="n">zs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">IndexError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+                    <span class="k">pass</span>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">zs</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Melek Derman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

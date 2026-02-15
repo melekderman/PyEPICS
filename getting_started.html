@@ -19,7 +19,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Data Pipeline" href="pipeline.html" />
+    <link rel="next" title="User Guide" href="user_guide.html" />
     <link rel="prev" title="PyEPICS Documentation" href="index.html" /> 
 </head>
 
@@ -49,7 +49,9 @@
 <li class="toctree-l2"><a class="reference internal" href="#quick-start">Quick Start</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide.html">User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_sources.html">Data Sources</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
@@ -81,22 +83,54 @@
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
 <section id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>numpy<span class="w"> </span>h5py<span class="w"> </span>endf
-
-<span class="c1"># For downloading data from IAEA:</span>
-pip<span class="w"> </span>install<span class="w"> </span>requests<span class="w"> </span>beautifulsoup4
+<p>From PyPI (when published):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>pyepics-data
 </pre></div>
 </div>
+<p>With optional extras:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Plotting and pandas support</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;pyepics-data[plot,pandas]&quot;</span>
+
+<span class="c1"># All optional dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;pyepics-data[all]&quot;</span>
+</pre></div>
+</div>
+<p>From source (development):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/melekderman/PyEPICS.git
+<span class="nb">cd</span><span class="w"> </span>PyEPICS
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</pre></div>
+</div>
+<p>See <a class="reference external" href="https://github.com/melekderman/PyEPICS/blob/main/INSTALL.md">INSTALL.md</a>
+for full details.</p>
 </section>
 <section id="quick-start">
 <h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h2>
+<p>High-level client API:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pyepics</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPICSClient</span>
+
+<span class="n">client</span> <span class="o">=</span> <span class="n">EPICSClient</span><span class="p">(</span><span class="s2">&quot;data/endf&quot;</span><span class="p">)</span>
+
+<span class="c1"># Query an element by symbol, name, or atomic number</span>
+<span class="n">fe</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_element</span><span class="p">(</span><span class="s2">&quot;Fe&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">Z</span><span class="p">,</span> <span class="n">fe</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>            <span class="c1"># 26, &quot;Fe&quot;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">binding_energies</span><span class="p">)</span>         <span class="c1"># {&#39;K&#39;: 7112.0, &#39;L1&#39;: 844.6, ...}</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">electron_cross_section_labels</span><span class="p">)</span>
+
+<span class="c1"># Compare multiple elements</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">compare_df</span><span class="p">([</span><span class="s2">&quot;Fe&quot;</span><span class="p">,</span> <span class="s2">&quot;Cu&quot;</span><span class="p">,</span> <span class="s2">&quot;Au&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Low-level reader API:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pyepics</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
 
 <span class="n">reader</span> <span class="o">=</span> <span class="n">EEDLReader</span><span class="p">()</span>
-<span class="n">dataset</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;eedl/EEDL.ZA026000.endf&quot;</span><span class="p">)</span>
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="s2">&quot;data/endf/eedl/EEDL.ZA026000.endf&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">Z</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>  <span class="c1"># 26, &quot;Fe&quot;</span>
 </pre></div>
 </div>
+<p>See <a class="reference internal" href="user_guide.html"><span class="doc">User Guide</span></a> for more examples including plotting and reading
+HDF5 output files.</p>
 </section>
 </section>
 
@@ -105,7 +139,7 @@ pip<span class="w"> </span>install<span class="w"> </span>requests<span class="w
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="index.html" class="btn btn-neutral float-left" title="PyEPICS Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="pipeline.html" class="btn btn-neutral float-right" title="Data Pipeline" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="user_guide.html" class="btn btn-neutral float-right" title="User Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

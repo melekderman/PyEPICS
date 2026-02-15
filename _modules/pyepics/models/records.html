@@ -1,0 +1,440 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyepics.models.records &mdash; PyEPICS 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            PyEPICS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../data_sources.html">Data Sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">PyEPICS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyepics.models.records</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyepics.models.records</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) 2026 Melek Derman</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Typed dataclass models for EPICS parsed datasets</span>
+
+<span class="sd">Every model is a frozen-safe ``dataclass`` carrying scalar metadata and</span>
+<span class="sd">NumPy arrays.  Models are the sole output of the reader layer and the</span>
+<span class="sd">sole input accepted by the converter layer, enforcing strict separation</span>
+<span class="sd">of concerns.</span>
+
+<span class="sd">Hierarchy</span>
+<span class="sd">---------</span>
+<span class="sd">::</span>
+
+<span class="sd">    CrossSectionRecord   — energy / xs pair with optional interpolation info</span>
+<span class="sd">    DistributionRecord   — flat (inc_energy, value, probability) triple</span>
+<span class="sd">    FormFactorRecord     — x / y pair (momentum transfer / form factor)</span>
+<span class="sd">    SubshellTransition   — single radiative or Auger transition</span>
+<span class="sd">    SubshellRelaxation   — one subshell&#39;s relaxation data</span>
+<span class="sd">    EEDLDataset          — full electron (EEDL) parsed output</span>
+<span class="sd">    EPDLDataset          — full photon  (EPDL) parsed output</span>
+<span class="sd">    EADLDataset          — full atomic  (EADL) parsed output</span>
+
+<span class="sd">Units</span>
+<span class="sd">-----</span>
+<span class="sd">* Energies are in **eV** unless explicitly noted otherwise.</span>
+<span class="sd">* Cross sections are in **barns** (ENDF convention).</span>
+<span class="sd">* Momentum-transfer values are in **1/Å** (inverse ångström).</span>
+<span class="sd">* Probabilities are dimensionless fractions summing to ≈ 1 per subshell.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Atomic-level building blocks</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="CrossSectionRecord">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.CrossSectionRecord">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CrossSectionRecord</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single cross-section table (energy vs. σ)</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    label : str</span>
+<span class="sd">        Short mnemonic name (e.g. ``&quot;xs_tot&quot;``, ``&quot;xs_K&quot;``).</span>
+<span class="sd">    energy : numpy.ndarray</span>
+<span class="sd">        Incident-energy grid, shape ``(N,)``, units eV.</span>
+<span class="sd">        Must be monotonically non-decreasing.</span>
+<span class="sd">    cross_section : numpy.ndarray</span>
+<span class="sd">        Cross-section values, shape ``(N,)``, units barns.</span>
+<span class="sd">        Must be non-negative.</span>
+<span class="sd">    breakpoints : numpy.ndarray | None</span>
+<span class="sd">        ENDF TAB1 interpolation-region breakpoints, or ``None``.</span>
+<span class="sd">    interpolation : numpy.ndarray | None</span>
+<span class="sd">        ENDF TAB1 interpolation law codes, or ``None``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">energy</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">cross_section</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">breakpoints</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">interpolation</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="DistributionRecord">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.DistributionRecord">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DistributionRecord</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A flat ENDF distribution (incident energy → outgoing value / PDF)</span>
+
+<span class="sd">    The three arrays are aligned element-wise: for each index *k*,</span>
+<span class="sd">    ``inc_energy[k]`` is the incident energy, ``value[k]`` is the</span>
+<span class="sd">    outgoing quantity (cosine μ or secondary energy E&#39;), and</span>
+<span class="sd">    ``probability[k]`` is the probability density.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    label : str</span>
+<span class="sd">        Short mnemonic name (e.g. ``&quot;ang_lge&quot;``, ``&quot;spec_K&quot;``).</span>
+<span class="sd">    inc_energy : numpy.ndarray</span>
+<span class="sd">        Incident energies, shape ``(M,)``, units eV.</span>
+<span class="sd">    value : numpy.ndarray</span>
+<span class="sd">        Outgoing quantity, shape ``(M,)``.</span>
+<span class="sd">    probability : numpy.ndarray</span>
+<span class="sd">        Probability-density values, shape ``(M,)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">inc_energy</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">probability</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></div>
+
+
+
+<div class="viewcode-block" id="AverageEnergyLoss">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.AverageEnergyLoss">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">AverageEnergyLoss</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Average energy loss vs. incident energy</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    label : str</span>
+<span class="sd">        Short mnemonic name (e.g. ``&quot;loss_exc&quot;``).</span>
+<span class="sd">    energy : numpy.ndarray</span>
+<span class="sd">        Incident-energy grid, shape ``(N,)``, units eV.</span>
+<span class="sd">    avg_loss : numpy.ndarray</span>
+<span class="sd">        Average energy loss per collision, shape ``(N,)``, units eV.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">energy</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">avg_loss</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></div>
+
+
+
+<div class="viewcode-block" id="FormFactorRecord">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.FormFactorRecord">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">FormFactorRecord</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A form-factor or scattering-function table</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    label : str</span>
+<span class="sd">        Short mnemonic (e.g. ``&quot;ff_coherent&quot;``, ``&quot;sf_incoherent&quot;``).</span>
+<span class="sd">    x : numpy.ndarray</span>
+<span class="sd">        Independent variable — momentum transfer (1/Å) or energy (eV).</span>
+<span class="sd">    y : numpy.ndarray</span>
+<span class="sd">        Form factor or scattering function values, same shape as *x*.</span>
+<span class="sd">    breakpoints : numpy.ndarray | None</span>
+<span class="sd">        ENDF TAB1 interpolation-region breakpoints.</span>
+<span class="sd">    interpolation : numpy.ndarray | None</span>
+<span class="sd">        ENDF TAB1 interpolation law codes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">breakpoints</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">interpolation</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Atomic relaxation building blocks</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="SubshellTransition">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.SubshellTransition">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SubshellTransition</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single atomic-relaxation transition</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    origin_designator : int</span>
+<span class="sd">        EADL subshell designator of the originating electron.</span>
+<span class="sd">    origin_label : str</span>
+<span class="sd">        Human-readable label (e.g. ``&quot;L1&quot;``).</span>
+<span class="sd">    secondary_designator : int</span>
+<span class="sd">        Designator for the subshell that fills the vacancy.</span>
+<span class="sd">        Zero (0) indicates a radiative (X-ray) transition.</span>
+<span class="sd">    secondary_label : str</span>
+<span class="sd">        ``&quot;radiative&quot;`` when *secondary_designator* is 0, else the</span>
+<span class="sd">        subshell label (e.g. ``&quot;M2&quot;``).</span>
+<span class="sd">    energy_eV : float</span>
+<span class="sd">        Transition energy (eV).</span>
+<span class="sd">    probability : float</span>
+<span class="sd">        Fractional probability of this transition occurring.</span>
+<span class="sd">    is_radiative : bool</span>
+<span class="sd">        ``True`` for X-ray emission, ``False`` for Auger / Coster-Kronig.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">origin_designator</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">origin_label</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">secondary_designator</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">secondary_label</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">energy_eV</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">probability</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">is_radiative</span><span class="p">:</span> <span class="nb">bool</span></div>
+
+
+
+<div class="viewcode-block" id="SubshellRelaxation">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.SubshellRelaxation">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SubshellRelaxation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Relaxation data for a single atomic subshell</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    designator : int</span>
+<span class="sd">        EADL numeric subshell designator (1 = K, 2 = L1, …).</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Standard label (e.g. ``&quot;K&quot;``, ``&quot;L1&quot;``).</span>
+<span class="sd">    binding_energy_eV : float</span>
+<span class="sd">        Binding energy of the subshell (eV).</span>
+<span class="sd">    n_electrons : float</span>
+<span class="sd">        Number of electrons in the neutral atom.</span>
+<span class="sd">    transitions : list[SubshellTransition]</span>
+<span class="sd">        All radiative and non-radiative transitions from this subshell.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">designator</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">binding_energy_eV</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">n_electrons</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">transitions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">SubshellTransition</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Top-level dataset models  (one per EPICS library)</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<div class="viewcode-block" id="EEDLDataset">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.EEDLDataset">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">EEDLDataset</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete parsed output of an EEDL (Evaluated Electron Data Library) file</span>
+
+<span class="sd">    Instances are returned by :meth:`EEDLReader.read` and consumed by</span>
+<span class="sd">    :func:`convert_dataset_to_hdf5`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    Z : int</span>
+<span class="sd">        Atomic number.</span>
+<span class="sd">    symbol : str</span>
+<span class="sd">        Element symbol (e.g. ``&quot;Fe&quot;``).</span>
+<span class="sd">    atomic_weight_ratio : float</span>
+<span class="sd">        AWR from the ENDF material header.</span>
+<span class="sd">    ZA : float</span>
+<span class="sd">        ZA identifier (Z × 1000 + A).</span>
+<span class="sd">    cross_sections : dict[str, CrossSectionRecord]</span>
+<span class="sd">        Keyed by abbreviation (e.g. ``&quot;xs_tot&quot;``, ``&quot;xs_K&quot;``).</span>
+<span class="sd">    distributions : dict[str, DistributionRecord]</span>
+<span class="sd">        Keyed by abbreviation (e.g. ``&quot;ang_lge&quot;``, ``&quot;spec_K&quot;``).</span>
+<span class="sd">    average_energy_losses : dict[str, AverageEnergyLoss]</span>
+<span class="sd">        Keyed by abbreviation (e.g. ``&quot;loss_exc&quot;``, ``&quot;loss_brem_spec&quot;``).</span>
+<span class="sd">    bremsstrahlung_spectra : DistributionRecord | None</span>
+<span class="sd">        Bremsstrahlung photon energy spectrum, if present.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">Z</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">atomic_weight_ratio</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">ZA</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">cross_sections</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">CrossSectionRecord</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">distributions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DistributionRecord</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">average_energy_losses</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">AverageEnergyLoss</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">bremsstrahlung_spectra</span><span class="p">:</span> <span class="n">DistributionRecord</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="EPDLDataset">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.EPDLDataset">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">EPDLDataset</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete parsed output of an EPDL (Evaluated Photon Data Library) file</span>
+
+<span class="sd">    Instances are returned by :meth:`EPDLReader.read` and consumed by</span>
+<span class="sd">    :func:`convert_dataset_to_hdf5`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    Z : int</span>
+<span class="sd">        Atomic number.</span>
+<span class="sd">    symbol : str</span>
+<span class="sd">        Element symbol.</span>
+<span class="sd">    atomic_weight_ratio : float</span>
+<span class="sd">        AWR from the ENDF material header.</span>
+<span class="sd">    ZA : float</span>
+<span class="sd">        ZA identifier.</span>
+<span class="sd">    cross_sections : dict[str, CrossSectionRecord]</span>
+<span class="sd">        Photon cross sections keyed by abbreviation.</span>
+<span class="sd">    form_factors : dict[str, FormFactorRecord]</span>
+<span class="sd">        Form factors / scattering functions keyed by abbreviation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">Z</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">atomic_weight_ratio</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">ZA</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">cross_sections</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">CrossSectionRecord</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">form_factors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">FormFactorRecord</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="EADLDataset">
+<a class="viewcode-back" href="../../../api.html#pyepics.models.records.EADLDataset">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">EADLDataset</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete parsed output of an EADL (Evaluated Atomic Data Library) file</span>
+
+<span class="sd">    Instances are returned by :meth:`EADLReader.read` and consumed by</span>
+<span class="sd">    :func:`convert_dataset_to_hdf5`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    Z : int</span>
+<span class="sd">        Atomic number.</span>
+<span class="sd">    symbol : str</span>
+<span class="sd">        Element symbol.</span>
+<span class="sd">    atomic_weight_ratio : float</span>
+<span class="sd">        AWR from the ENDF material header.</span>
+<span class="sd">    ZA : float</span>
+<span class="sd">        ZA identifier.</span>
+<span class="sd">    n_subshells : int</span>
+<span class="sd">        Number of subshells for which relaxation data is given.</span>
+<span class="sd">    subshells : dict[str, SubshellRelaxation]</span>
+<span class="sd">        Relaxation data keyed by subshell label (e.g. ``&quot;K&quot;``).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">Z</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">symbol</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">atomic_weight_ratio</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">ZA</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">n_subshells</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">subshells</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SubshellRelaxation</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Melek Derman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

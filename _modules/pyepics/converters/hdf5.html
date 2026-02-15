@@ -1,0 +1,825 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyepics.converters.hdf5 &mdash; PyEPICS 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            PyEPICS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../data_sources.html">Data Sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">PyEPICS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyepics.converters.hdf5</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyepics.converters.hdf5</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) 2026 Melek Derman</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">HDF5 converter for EPICS parsed datasets</span>
+
+<span class="sd">Writes deterministic, self-documenting HDF5 files from the typed</span>
+<span class="sd">dataclass models returned by the reader layer.</span>
+
+<span class="sd">HDF5 Layout</span>
+<span class="sd">-----------</span>
+<span class="sd">All three dataset types share a common metadata block and then branch</span>
+<span class="sd">into library-specific groups::</span>
+
+<span class="sd">    /metadata/</span>
+<span class="sd">        Z                   int64    — atomic number</span>
+<span class="sd">        symbol              string   — element symbol</span>
+<span class="sd">        ZA                  float64  — ZA identifier (Z × 1000 + A)</span>
+<span class="sd">        AWR                 float64  — atomic weight ratio</span>
+
+<span class="sd">    /EEDL/</span>
+<span class="sd">        Z_{ZZZ}/</span>
+<span class="sd">            total/</span>
+<span class="sd">                energy              float64[]   units: eV</span>
+<span class="sd">                cross_section       float64[]   units: barns</span>
+<span class="sd">            elastic_scatter/</span>
+<span class="sd">                total/  ...</span>
+<span class="sd">                large_angle/ ...</span>
+<span class="sd">            ionization/</span>
+<span class="sd">                total/  ...</span>
+<span class="sd">                subshells/</span>
+<span class="sd">                    K/  ...</span>
+<span class="sd">            bremsstrahlung/ ...</span>
+<span class="sd">            excitation/ ...</span>
+
+<span class="sd">    /EPDL/</span>
+<span class="sd">        Z_{ZZZ}/</span>
+<span class="sd">            total/ ...</span>
+<span class="sd">            coherent_scattering/ ...</span>
+<span class="sd">            incoherent_scattering/ ...</span>
+<span class="sd">            photoelectric/ ...</span>
+<span class="sd">            pair_production/ ...</span>
+<span class="sd">            form_factors/ ...</span>
+
+<span class="sd">    /EADL/</span>
+<span class="sd">        Z_{ZZZ}/</span>
+<span class="sd">            subshells/</span>
+<span class="sd">                K/</span>
+<span class="sd">                    binding_energy_eV   float64</span>
+<span class="sd">                    n_electrons         float64</span>
+<span class="sd">                    radiative/ ...</span>
+<span class="sd">                    non_radiative/ ...</span>
+
+<span class="sd">Physical units are stored as HDF5 dataset attributes</span>
+<span class="sd">(``ds.attrs[&quot;units&quot;] = &quot;eV&quot;``).  Element-level metadata (Z, AWR, etc.)</span>
+<span class="sd">are stored as group attributes on the ``Z_{ZZZ}`` group.</span>
+
+<span class="sd">References</span>
+<span class="sd">----------</span>
+<span class="sd">- HDF5 best practices, The HDF Group.</span>
+<span class="sd">- ENDF-6 Formats Manual (ENDF-102).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">_exc</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+        <span class="s2">&quot;The &#39;h5py&#39; package is required by the HDF5 converter.  &quot;</span>
+        <span class="s2">&quot;Install it with: pip install h5py&quot;</span>
+    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">_exc</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConversionError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.models.records</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">EADLDataset</span><span class="p">,</span>
+    <span class="n">EEDLDataset</span><span class="p">,</span>
+    <span class="n">EPDLDataset</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">SUBSHELL_LABELS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.utils.parsing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">build_pdf</span><span class="p">,</span>
+    <span class="n">linear_interpolation</span><span class="p">,</span>
+    <span class="n">small_angle_scattering_cosine</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Internal writers</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_metadata</span><span class="p">(</span>
+    <span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">DatasetModel</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write the ``/metadata`` group to an HDF5 file</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    h5f : h5py.File</span>
+<span class="sd">        Open HDF5 file handle (write mode).</span>
+<span class="sd">    dataset : DatasetModel</span>
+<span class="sd">        Parsed dataset providing Z, symbol, ZA, and AWR.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">meta</span> <span class="o">=</span> <span class="n">h5f</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">)</span>
+    <span class="n">meta</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;Z&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">Z</span><span class="p">))</span>
+    <span class="n">meta</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;symbol&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>
+    <span class="n">meta</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;ZA&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">ZA</span><span class="p">))</span>
+    <span class="n">meta</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;AWR&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">atomic_weight_ratio</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_create_xs_dataset</span><span class="p">(</span>
+    <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">,</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">units</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Dataset</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a float64 dataset with a ``units`` attribute</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    group : h5py.Group</span>
+<span class="sd">        Parent group.</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Dataset name.</span>
+<span class="sd">    data : numpy.ndarray</span>
+<span class="sd">        Data array.</span>
+<span class="sd">    units : str</span>
+<span class="sd">        Physical units string stored as ``ds.attrs[&quot;units&quot;]``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    h5py.Dataset</span>
+<span class="sd">        The created dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">))</span>
+    <span class="n">ds</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">units</span>
+    <span class="k">return</span> <span class="n">ds</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_eedl</span><span class="p">(</span><span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">EEDLDataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write an EEDL dataset to the ``/EEDL/Z_{ZZZ}`` group</span>
+
+<span class="sd">    Produces the MCDC-compatible layout, including interpolation of all</span>
+<span class="sd">    cross sections onto a common energy grid and computation of</span>
+<span class="sd">    small-angle scattering cosine distributions.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    h5f : h5py.File</span>
+<span class="sd">        Open HDF5 file.</span>
+<span class="sd">    dataset : EEDLDataset</span>
+<span class="sd">        Parsed EEDL dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Z</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">Z</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">h5f</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;EEDL/Z_</span><span class="si">{</span><span class="n">Z</span><span class="si">:</span><span class="s2">03d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;Z&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Z</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">symbol</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;AWR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">atomic_weight_ratio</span>
+
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cross_sections</span>
+
+    <span class="c1"># -- Common energy grid from total cross section ---------------------</span>
+    <span class="k">if</span> <span class="s2">&quot;xs_tot&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No total cross section (xs_tot) for Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">xs_energy_grid</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span>
+    <span class="n">total_xs</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span>
+
+    <span class="c1"># Helper to interpolate onto grid</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">interp</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Interpolate cross-section *key* onto the common energy grid.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">linear_interpolation</span><span class="p">(</span><span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xs_energy_grid</span><span class="p">)</span>
+
+    <span class="n">xs_sc_total</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_el&quot;</span><span class="p">)</span>
+    <span class="n">xs_sc_la</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_lge&quot;</span><span class="p">)</span>
+    <span class="n">xs_brem</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_brem&quot;</span><span class="p">)</span>
+    <span class="n">xs_exc</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_exc&quot;</span><span class="p">)</span>
+    <span class="n">xs_ion_total</span> <span class="o">=</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_ion&quot;</span><span class="p">)</span>
+    <span class="n">xs_sc_sa</span> <span class="o">=</span> <span class="n">xs_sc_total</span> <span class="o">-</span> <span class="n">xs_sc_la</span>
+
+    <span class="c1"># Write common grid</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="s2">&quot;xs_energy_grid&quot;</span><span class="p">,</span> <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Total</span>
+    <span class="n">total_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;total&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">total_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">total_xs</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Elastic scattering</span>
+    <span class="n">es_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;elastic_scattering&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">es_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_sc_total</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Large angle</span>
+    <span class="n">la_grp</span> <span class="o">=</span> <span class="n">es_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;large_angle&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">la_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_sc_la</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;ang_lge&quot;</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">distributions</span><span class="p">:</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">distributions</span><span class="p">[</span><span class="s2">&quot;ang_lge&quot;</span><span class="p">]</span>
+        <span class="n">eg</span><span class="p">,</span> <span class="n">off</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">PDF</span> <span class="o">=</span> <span class="n">build_pdf</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">inc_energy</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">probability</span><span class="p">)</span>
+        <span class="n">sc_grp</span> <span class="o">=</span> <span class="n">la_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;scattering_cosine&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sc_grp</span><span class="p">,</span> <span class="s2">&quot;energy_grid&quot;</span><span class="p">,</span> <span class="n">eg</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">sc_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;energy_offset&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">off</span><span class="p">)</span>
+        <span class="n">sc_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">val</span><span class="p">)</span>
+        <span class="n">sc_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;PDF&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">PDF</span><span class="p">)</span>
+
+    <span class="c1"># Small angle</span>
+    <span class="n">sa_grp</span> <span class="o">=</span> <span class="n">es_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;small_angle&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sa_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_sc_sa</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">mask_sa</span> <span class="o">=</span> <span class="n">xs_sc_sa</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">mask_sa</span><span class="p">):</span>
+        <span class="n">eg_sa</span><span class="p">,</span> <span class="n">off_sa</span><span class="p">,</span> <span class="n">val_sa</span><span class="p">,</span> <span class="n">pdf_sa</span> <span class="o">=</span> <span class="n">small_angle_scattering_cosine</span><span class="p">(</span>
+            <span class="n">Z</span><span class="p">,</span> <span class="n">xs_energy_grid</span><span class="p">[</span><span class="n">mask_sa</span><span class="p">],</span> <span class="n">n_mu</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sc_grp_sa</span> <span class="o">=</span> <span class="n">sa_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;scattering_cosine&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sc_grp_sa</span><span class="p">,</span> <span class="s2">&quot;energy_grid&quot;</span><span class="p">,</span> <span class="n">eg_sa</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">sc_grp_sa</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;energy_offset&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">off_sa</span><span class="p">)</span>
+        <span class="n">sc_grp_sa</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">val_sa</span><span class="p">)</span>
+        <span class="n">sc_grp_sa</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;PDF&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">pdf_sa</span><span class="p">)</span>
+
+    <span class="c1"># Bremsstrahlung</span>
+    <span class="n">brem_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;bremsstrahlung&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">brem_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_brem</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;loss_brem_spec&quot;</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">average_energy_losses</span><span class="p">:</span>
+        <span class="n">ael</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">average_energy_losses</span><span class="p">[</span><span class="s2">&quot;loss_brem_spec&quot;</span><span class="p">]</span>
+        <span class="n">el_grp</span> <span class="o">=</span> <span class="n">brem_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;energy_loss&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;energy&quot;</span><span class="p">,</span> <span class="n">ael</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">ael</span><span class="o">.</span><span class="n">avg_loss</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Excitation</span>
+    <span class="n">exc_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;excitation&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">exc_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_exc</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;loss_exc&quot;</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">average_energy_losses</span><span class="p">:</span>
+        <span class="n">ael</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">average_energy_losses</span><span class="p">[</span><span class="s2">&quot;loss_exc&quot;</span><span class="p">]</span>
+        <span class="n">el_grp</span> <span class="o">=</span> <span class="n">exc_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;energy_loss&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;energy&quot;</span><span class="p">,</span> <span class="n">ael</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">el_grp</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">ael</span><span class="o">.</span><span class="n">avg_loss</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Ionization</span>
+    <span class="n">ion_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;ionization&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">ion_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs_ion_total</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">subs_grp</span> <span class="o">=</span> <span class="n">ion_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">xs_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;xs_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">spec_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;spec_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">if</span> <span class="n">xs_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">shell_xs</span> <span class="o">=</span> <span class="n">linear_interpolation</span><span class="p">(</span>
+            <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">xs_key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">xs_key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sg</span> <span class="o">=</span> <span class="n">subs_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="n">shell_label</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sg</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">shell_xs</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">spec_key</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">distributions</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">distributions</span><span class="p">[</span><span class="n">spec_key</span><span class="p">]</span>
+            <span class="n">egp</span><span class="p">,</span> <span class="n">offp</span><span class="p">,</span> <span class="n">valp</span><span class="p">,</span> <span class="n">PDFp</span> <span class="o">=</span> <span class="n">build_pdf</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">inc_energy</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">probability</span><span class="p">)</span>
+            <span class="n">pg</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;product&quot;</span><span class="p">)</span>
+            <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">pg</span><span class="p">,</span> <span class="s2">&quot;energy_grid&quot;</span><span class="p">,</span> <span class="n">egp</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+            <span class="n">pg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;energy_offset&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">offp</span><span class="p">)</span>
+            <span class="n">pg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">valp</span><span class="p">)</span>
+            <span class="n">pg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;PDF&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">PDFp</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Wrote EEDL data for Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_epdl</span><span class="p">(</span><span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">EPDLDataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write an EPDL dataset to the ``/EPDL/Z_{ZZZ}`` group</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    h5f : h5py.File</span>
+<span class="sd">        Open HDF5 file.</span>
+<span class="sd">    dataset : EPDLDataset</span>
+<span class="sd">        Parsed EPDL dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Z</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">Z</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">h5f</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;EPDL/Z_</span><span class="si">{</span><span class="n">Z</span><span class="si">:</span><span class="s2">03d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;Z&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Z</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">symbol</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;AWR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">atomic_weight_ratio</span>
+
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cross_sections</span>
+    <span class="n">ff</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">form_factors</span>
+
+    <span class="k">if</span> <span class="s2">&quot;xs_tot&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No total cross section for EPDL Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">xs_energy_grid</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">interp</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Interpolate cross-section *key* onto the common energy grid.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">linear_interpolation</span><span class="p">(</span><span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xs_energy_grid</span><span class="p">)</span>
+
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="s2">&quot;xs_energy_grid&quot;</span><span class="p">,</span> <span class="n">xs_energy_grid</span><span class="p">,</span> <span class="s2">&quot;eV&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Total</span>
+    <span class="n">tot_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;total&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">tot_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="s2">&quot;xs_tot&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Coherent scattering</span>
+    <span class="n">coh_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;coherent_scattering&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">coh_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_coherent&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;ff_coherent&quot;</span> <span class="ow">in</span> <span class="n">ff</span><span class="p">:</span>
+        <span class="n">ff_grp</span> <span class="o">=</span> <span class="n">coh_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;form_factor&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">ff_grp</span><span class="p">,</span> <span class="s2">&quot;momentum_transfer&quot;</span><span class="p">,</span> <span class="n">ff</span><span class="p">[</span><span class="s2">&quot;ff_coherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="s2">&quot;1/angstrom&quot;</span><span class="p">)</span>
+        <span class="n">ff_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">ff</span><span class="p">[</span><span class="s2">&quot;ff_coherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+
+    <span class="c1"># Incoherent scattering</span>
+    <span class="n">inc_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;incoherent_scattering&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">inc_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_incoherent&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;sf_incoherent&quot;</span> <span class="ow">in</span> <span class="n">ff</span><span class="p">:</span>
+        <span class="n">sf_grp</span> <span class="o">=</span> <span class="n">inc_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;scattering_function&quot;</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sf_grp</span><span class="p">,</span> <span class="s2">&quot;momentum_transfer&quot;</span><span class="p">,</span> <span class="n">ff</span><span class="p">[</span><span class="s2">&quot;sf_incoherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="s2">&quot;1/angstrom&quot;</span><span class="p">)</span>
+        <span class="n">sf_grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">ff</span><span class="p">[</span><span class="s2">&quot;sf_incoherent&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+
+    <span class="c1"># Photoelectric</span>
+    <span class="n">pe_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;photoelectric&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">pe_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_photoelectric&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">pe_subs</span> <span class="o">=</span> <span class="n">pe_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">mt</span><span class="p">,</span> <span class="n">shell_label</span> <span class="ow">in</span> <span class="n">SUBSHELL_LABELS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;xs_pe_</span><span class="si">{</span><span class="n">shell_label</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">sg</span> <span class="o">=</span> <span class="n">pe_subs</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="n">shell_label</span><span class="p">)</span>
+        <span class="n">shell_xs</span> <span class="o">=</span> <span class="n">linear_interpolation</span><span class="p">(</span><span class="n">xs_energy_grid</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">cross_section</span><span class="p">)</span>
+        <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">sg</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">shell_xs</span><span class="p">,</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Pair production</span>
+    <span class="n">pp_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;pair_production&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">pp_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_pair_total&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">nuc_grp</span> <span class="o">=</span> <span class="n">pp_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;nuclear&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">nuc_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_pair_nuclear&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+    <span class="n">ele_grp</span> <span class="o">=</span> <span class="n">pp_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;electron&quot;</span><span class="p">)</span>
+    <span class="n">_create_xs_dataset</span><span class="p">(</span><span class="n">ele_grp</span><span class="p">,</span> <span class="s2">&quot;xs&quot;</span><span class="p">,</span> <span class="n">interp</span><span class="p">(</span><span class="s2">&quot;xs_pair_electron&quot;</span><span class="p">),</span> <span class="s2">&quot;barns&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Wrote EPDL data for Z=</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_eadl</span><span class="p">(</span><span class="n">h5f</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">EADLDataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write an EADL dataset to the ``/EADL/Z_{ZZZ}`` group</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    h5f : h5py.File</span>
+<span class="sd">        Open HDF5 file.</span>
+<span class="sd">    dataset : EADLDataset</span>
+<span class="sd">        Parsed EADL dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Z</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">Z</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">h5f</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;EADL/Z_</span><span class="si">{</span><span class="n">Z</span><span class="si">:</span><span class="s2">03d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;Z&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Z</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">symbol</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;AWR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">atomic_weight_ratio</span>
+
+    <span class="n">root</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;n_subshells&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">dataset</span><span class="o">.</span><span class="n">n_subshells</span><span class="p">)</span>
+    <span class="n">subs_grp</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;subshells&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Summary arrays</span>
+    <span class="n">shell_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">binding_energies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">n_electrons_arr</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">shell</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">subshells</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">shell_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">binding_energies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">binding_energy_eV</span><span class="p">)</span>
+        <span class="n">n_electrons_arr</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">n_electrons</span><span class="p">)</span>
+
+        <span class="n">sg</span> <span class="o">=</span> <span class="n">subs_grp</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">sg</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;designator&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">designator</span>
+        <span class="n">ds_be</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;binding_energy_eV&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">shell</span><span class="o">.</span><span class="n">binding_energy_eV</span><span class="p">)</span>
+        <span class="n">ds_be</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+        <span class="n">sg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;n_electrons&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">shell</span><span class="o">.</span><span class="n">n_electrons</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">shell</span><span class="o">.</span><span class="n">transitions</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Separate radiative / non-radiative</span>
+        <span class="n">rad_trans</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">shell</span><span class="o">.</span><span class="n">transitions</span> <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">is_radiative</span><span class="p">]</span>
+        <span class="n">auger_trans</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">shell</span><span class="o">.</span><span class="n">transitions</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">t</span><span class="o">.</span><span class="n">is_radiative</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">rad_trans</span><span class="p">:</span>
+            <span class="n">rg</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;radiative&quot;</span><span class="p">)</span>
+            <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;origin_designator&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">origin_designator</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;i4&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span> <span class="o">=</span> <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;energy_eV&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">energy_eV</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+            <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;probability&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">fy</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">rad_trans</span><span class="p">)</span>
+            <span class="n">rg</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;fluorescence_yield&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">fy</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">auger_trans</span><span class="p">:</span>
+            <span class="n">ag</span> <span class="o">=</span> <span class="n">sg</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;non_radiative&quot;</span><span class="p">)</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;origin_designator&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">origin_designator</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;i4&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;secondary_designator&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">secondary_designator</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;i4&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span> <span class="o">=</span> <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;energy_eV&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">energy_eV</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ds_e</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+                <span class="s2">&quot;probability&quot;</span><span class="p">,</span>
+                <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">ay</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">probability</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">auger_trans</span><span class="p">)</span>
+            <span class="n">ag</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;auger_yield&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">ay</span><span class="p">)</span>
+
+    <span class="c1"># Summary datasets at root level</span>
+    <span class="k">if</span> <span class="n">shell_names</span><span class="p">:</span>
+        <span class="n">root</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+            <span class="s2">&quot;shell_names&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">shell_names</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;S8&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">ds_be</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+            <span class="s2">&quot;binding_energies_eV&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">binding_energies</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">ds_be</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;units&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span>
+        <span class="n">root</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span>
+            <span class="s2">&quot;n_electrons&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">n_electrons_arr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;f8&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Wrote EADL data for Z=</span><span class="si">%d</span><span class="s2"> (</span><span class="si">%d</span><span class="s2"> subshells)&quot;</span><span class="p">,</span> <span class="n">Z</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">shell_names</span><span class="p">))</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Public API</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">_WRITERS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">_write_eedl</span><span class="p">,</span> <span class="n">EEDLDataset</span><span class="p">),</span>
+    <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">_write_eadl</span><span class="p">,</span> <span class="n">EADLDataset</span><span class="p">),</span>
+    <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">_write_epdl</span><span class="p">,</span> <span class="n">EPDLDataset</span><span class="p">),</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="convert_dataset_to_hdf5">
+<a class="viewcode-back" href="../../../api.html#pyepics.converters.hdf5.convert_dataset_to_hdf5">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_dataset_to_hdf5</span><span class="p">(</span>
+    <span class="n">dataset_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">],</span>
+    <span class="n">source_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read an ENDF source file and write a structured HDF5 file</span>
+
+<span class="sd">    This is the main convenience function of the converter layer.  It</span>
+<span class="sd">    instantiates the appropriate reader, parses the source file, and</span>
+<span class="sd">    writes the result to an HDF5 file with a deterministic,</span>
+<span class="sd">    self-documenting group layout.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dataset_type : ``&quot;EEDL&quot;`` | ``&quot;EADL&quot;`` | ``&quot;EPDL&quot;``</span>
+<span class="sd">        Which EPICS library the source file belongs to.</span>
+<span class="sd">    source_path : Path | str</span>
+<span class="sd">        Path to the ENDF source file.</span>
+<span class="sd">    output_path : Path | str</span>
+<span class="sd">        Path for the output HDF5 file.  Parent directories are created</span>
+<span class="sd">        automatically.</span>
+<span class="sd">    validate : bool, optional</span>
+<span class="sd">        Run post-parse validation.  Default ``True``.</span>
+<span class="sd">    overwrite : bool, optional</span>
+<span class="sd">        If ``True``, overwrite an existing HDF5 file.  If ``False``</span>
+<span class="sd">        (default), raise :class:`~pyepics.exceptions.ConversionError`</span>
+<span class="sd">        when the output file already exists.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ConversionError</span>
+<span class="sd">        If *overwrite* is ``False`` and *output_path* exists, or if</span>
+<span class="sd">        any HDF5 write operation fails.</span>
+<span class="sd">    FileFormatError</span>
+<span class="sd">        If the source file cannot be opened.</span>
+<span class="sd">    ParseError</span>
+<span class="sd">        If the source file content is malformed.</span>
+<span class="sd">    ValidationError</span>
+<span class="sd">        If validation is enabled and fails.</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If *dataset_type* is not one of the supported types.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; convert_dataset_to_hdf5(</span>
+<span class="sd">    ...     &quot;EEDL&quot;,</span>
+<span class="sd">    ...     &quot;data/endf/eedl/EEDL.ZA026000.endf&quot;,</span>
+<span class="sd">    ...     &quot;output/Fe.h5&quot;,</span>
+<span class="sd">    ...     overwrite=True,</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">dataset_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_WRITERS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown dataset_type </span><span class="si">{</span><span class="n">dataset_type</span><span class="si">!r}</span><span class="s2">.  &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Must be one of: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">_WRITERS</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">src</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_path</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">out</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Output file </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2"> already exists and overwrite=False.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Select reader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eadl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EADLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.epdl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPDLReader</span>
+
+    <span class="n">reader_map</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="n">EEDLReader</span><span class="p">,</span>
+        <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="n">EADLReader</span><span class="p">,</span>
+        <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="n">EPDLReader</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">reader_map</span><span class="p">[</span><span class="n">dataset_type</span><span class="p">]()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Parsing </span><span class="si">%s</span><span class="s2"> from </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dataset_type</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="n">validate</span><span class="p">)</span>
+
+    <span class="c1"># Write HDF5</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">writer_fn</span><span class="p">,</span> <span class="n">expected_type</span> <span class="o">=</span> <span class="n">_WRITERS</span><span class="p">[</span><span class="n">dataset_type</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">expected_type</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Reader returned </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">expected_type</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;w&quot;</span> <span class="k">if</span> <span class="n">overwrite</span> <span class="k">else</span> <span class="s2">&quot;w-&quot;</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">out</span><span class="p">),</span> <span class="n">mode</span><span class="p">)</span> <span class="k">as</span> <span class="n">h5f</span><span class="p">:</span>
+            <span class="n">_write_metadata</span><span class="p">(</span><span class="n">h5f</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+            <span class="n">writer_fn</span><span class="p">(</span><span class="n">h5f</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">ConversionError</span><span class="p">):</span>
+            <span class="k">raise</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Failed to write HDF5 file </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote </span><span class="si">%s</span><span class="s2"> HDF5 file: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dataset_type</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Two-step pipeline: raw + MCDC</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_reader</span><span class="p">(</span><span class="n">dataset_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the correct reader class for a dataset type.&quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eedl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EEDLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.eadl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EADLReader</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.readers.epdl</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPDLReader</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="n">EEDLReader</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="n">EADLReader</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="n">EPDLReader</span><span class="p">}[</span><span class="n">dataset_type</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="create_raw_hdf5">
+<a class="viewcode-back" href="../../../api.html#pyepics.converters.hdf5.create_raw_hdf5">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_raw_hdf5</span><span class="p">(</span>
+    <span class="n">dataset_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">],</span>
+    <span class="n">source_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse an ENDF file and write a **raw** HDF5 file</span>
+
+<span class="sd">    Raw files preserve the original energy grids, breakpoints, and</span>
+<span class="sd">    interpolation info exactly as they appear in the ENDF evaluation.</span>
+<span class="sd">    They are suitable for external users who want full-fidelity data.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dataset_type : ``&quot;EEDL&quot;`` | ``&quot;EADL&quot;`` | ``&quot;EPDL&quot;``</span>
+<span class="sd">        Which EPICS library.</span>
+<span class="sd">    source_path : Path | str</span>
+<span class="sd">        Path to the ENDF source file.</span>
+<span class="sd">    output_path : Path | str</span>
+<span class="sd">        Path for the output HDF5 file.</span>
+<span class="sd">    validate : bool, optional</span>
+<span class="sd">        Post-parse validation.  Default ``True``.</span>
+<span class="sd">    overwrite : bool, optional</span>
+<span class="sd">        Overwrite existing file.  Default ``False``.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; create_raw_hdf5(&quot;EEDL&quot;, &quot;data/endf/eedl/EEDL.ZA026000.endf&quot;, &quot;data/raw/electron/Fe.h5&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.converters.raw_hdf5</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">write_raw_eedl</span><span class="p">,</span>
+        <span class="n">write_raw_epdl</span><span class="p">,</span>
+        <span class="n">write_raw_eadl</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">writers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="n">write_raw_eedl</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="n">write_raw_epdl</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="n">write_raw_eadl</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">dataset_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">writers</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown dataset_type: </span><span class="si">{</span><span class="n">dataset_type</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">src</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_path</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">out</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output file </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2"> already exists and overwrite=False.&quot;</span><span class="p">)</span>
+
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">_get_reader</span><span class="p">(</span><span class="n">dataset_type</span><span class="p">)()</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="n">validate</span><span class="p">)</span>
+
+    <span class="n">out</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;w&quot;</span> <span class="k">if</span> <span class="n">overwrite</span> <span class="k">else</span> <span class="s2">&quot;w-&quot;</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">out</span><span class="p">),</span> <span class="n">mode</span><span class="p">)</span> <span class="k">as</span> <span class="n">h5f</span><span class="p">:</span>
+            <span class="n">writers</span><span class="p">[</span><span class="n">dataset_type</span><span class="p">](</span><span class="n">h5f</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">ConversionError</span><span class="p">):</span>
+            <span class="k">raise</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write raw HDF5 </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote raw </span><span class="si">%s</span><span class="s2"> HDF5: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dataset_type</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_mcdc_hdf5">
+<a class="viewcode-back" href="../../../api.html#pyepics.converters.hdf5.create_mcdc_hdf5">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_mcdc_hdf5</span><span class="p">(</span>
+    <span class="n">dataset_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;EEDL&quot;</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">],</span>
+    <span class="n">source_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse an ENDF file and write an **MCDC-format** HDF5 file</span>
+
+<span class="sd">    MCDC files have cross sections interpolated onto a common energy</span>
+<span class="sd">    grid, compressed distribution tables, and analytically computed</span>
+<span class="sd">    small-angle scattering. They are optimised for transport codes.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dataset_type : ``&quot;EEDL&quot;`` | ``&quot;EADL&quot;`` | ``&quot;EPDL&quot;``</span>
+<span class="sd">        Which EPICS library.</span>
+<span class="sd">    source_path : Path | str</span>
+<span class="sd">        Path to the ENDF source file.</span>
+<span class="sd">    output_path : Path | str</span>
+<span class="sd">        Path for the output HDF5 file.</span>
+<span class="sd">    validate : bool, optional</span>
+<span class="sd">        Post-parse validation.  Default ``True``.</span>
+<span class="sd">    overwrite : bool, optional</span>
+<span class="sd">        Overwrite existing file.  Default ``False``.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; create_mcdc_hdf5(&quot;EEDL&quot;, &quot;data/endf/eedl/EEDL.ZA026000.endf&quot;, &quot;data/mcdc/electron/Fe.h5&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.converters.mcdc_hdf5</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">write_mcdc_eedl</span><span class="p">,</span>
+        <span class="n">write_mcdc_epdl</span><span class="p">,</span>
+        <span class="n">write_mcdc_eadl</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">writers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;EEDL&quot;</span><span class="p">:</span> <span class="n">write_mcdc_eedl</span><span class="p">,</span> <span class="s2">&quot;EPDL&quot;</span><span class="p">:</span> <span class="n">write_mcdc_epdl</span><span class="p">,</span> <span class="s2">&quot;EADL&quot;</span><span class="p">:</span> <span class="n">write_mcdc_eadl</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">dataset_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">writers</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown dataset_type: </span><span class="si">{</span><span class="n">dataset_type</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">src</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_path</span><span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">out</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output file </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2"> already exists and overwrite=False.&quot;</span><span class="p">)</span>
+
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">_get_reader</span><span class="p">(</span><span class="n">dataset_type</span><span class="p">)()</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="n">validate</span><span class="p">)</span>
+
+    <span class="n">out</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;w&quot;</span> <span class="k">if</span> <span class="n">overwrite</span> <span class="k">else</span> <span class="s2">&quot;w-&quot;</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">out</span><span class="p">),</span> <span class="n">mode</span><span class="p">)</span> <span class="k">as</span> <span class="n">h5f</span><span class="p">:</span>
+            <span class="n">writers</span><span class="p">[</span><span class="n">dataset_type</span><span class="p">](</span><span class="n">h5f</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">ConversionError</span><span class="p">):</span>
+            <span class="k">raise</span>
+        <span class="k">raise</span> <span class="n">ConversionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write MCDC HDF5 </span><span class="si">{</span><span class="n">out</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Wrote MCDC </span><span class="si">%s</span><span class="s2"> HDF5: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dataset_type</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Melek Derman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

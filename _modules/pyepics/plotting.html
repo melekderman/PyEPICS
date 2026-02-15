@@ -1,0 +1,425 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyepics.plotting &mdash; PyEPICS 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            PyEPICS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../data_sources.html">Data Sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">PyEPICS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyepics.plotting</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyepics.plotting</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) 2026 Melek Derman</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+<span class="c1"># -----------------------------------------------------------------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Optional plotting helpers for PyEPICS</span>
+
+<span class="sd">All functions in this module require ``matplotlib``.  The core library</span>
+<span class="sd">works without it — these are convenience wrappers for quick</span>
+<span class="sd">visualisation.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">&gt;&gt;&gt; from pyepics.plotting import plot_cross_sections, plot_binding_energies</span>
+<span class="sd">&gt;&gt;&gt; plot_cross_sections(client, &quot;Fe&quot;, labels=[&quot;xs_tot&quot;, &quot;xs_el&quot;])  # doctest: +SKIP</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Sequence</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">EPICSClient</span><span class="p">,</span> <span class="n">ElementID</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_import_matplotlib</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Import matplotlib or raise a helpful error.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+        <span class="k">return</span> <span class="n">plt</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+            <span class="s2">&quot;matplotlib is required for plotting. &quot;</span>
+            <span class="s2">&quot;Install it with: pip install matplotlib&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+
+<div class="viewcode-block" id="plot_cross_sections">
+<a class="viewcode-back" href="../../api.html#pyepics.plotting.plot_cross_sections">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
+    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
+    <span class="n">element</span><span class="p">:</span> <span class="s2">&quot;ElementID&quot;</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">labels</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">library</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;EEDL&quot;</span><span class="p">,</span>
+    <span class="n">logx</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">logy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Plot cross sections for a single element.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    client : EPICSClient</span>
+<span class="sd">        Initialised client instance.</span>
+<span class="sd">    element : int or str</span>
+<span class="sd">        Element identifier.</span>
+<span class="sd">    labels : sequence of str or None, optional</span>
+<span class="sd">        Cross-section labels to plot.  Defaults to all available.</span>
+<span class="sd">    library : str</span>
+<span class="sd">        ``&quot;EEDL&quot;`` or ``&quot;EPDL&quot;``.</span>
+<span class="sd">    logx, logy : bool</span>
+<span class="sd">        Use logarithmic axes.</span>
+<span class="sd">    title : str or None</span>
+<span class="sd">        Plot title.  Auto-generated if ``None``.</span>
+<span class="sd">    ax : matplotlib.axes.Axes or None</span>
+<span class="sd">        Existing axes to draw on.  Creates a new figure if ``None``.</span>
+<span class="sd">    show : bool</span>
+<span class="sd">        Call ``plt.show()`` at the end.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    matplotlib.axes.Axes</span>
+<span class="sd">        The axes object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">plt</span> <span class="o">=</span> <span class="n">_import_matplotlib</span><span class="p">()</span>
+
+    <span class="n">ep</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_element</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="p">[</span><span class="n">library</span><span class="p">])</span>
+    <span class="n">lib_upper</span> <span class="o">=</span> <span class="n">library</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">electron</span> <span class="k">if</span> <span class="n">lib_upper</span> <span class="o">==</span> <span class="s2">&quot;EEDL&quot;</span> <span class="k">else</span> <span class="n">ep</span><span class="o">.</span><span class="n">photon</span>
+    <span class="k">if</span> <span class="n">ds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No </span><span class="si">{</span><span class="n">lib_upper</span><span class="si">}</span><span class="s2"> data for </span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2"> (Z=</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">Z</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+
+    <span class="n">xs_dict</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">cross_sections</span>
+    <span class="k">if</span> <span class="n">labels</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">xs_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">label</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">xs_dict</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">rec</span> <span class="o">=</span> <span class="n">xs_dict</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">energy</span><span class="p">,</span> <span class="n">rec</span><span class="o">.</span><span class="n">cross_section</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">logx</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xscale</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">logy</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Energy (eV)&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Cross Section (barns)&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+        <span class="n">title</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2"> (Z=</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">Z</span><span class="si">}</span><span class="s2">) — </span><span class="si">{</span><span class="n">lib_upper</span><span class="si">}</span><span class="s2"> Cross Sections&quot;</span>
+    <span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">ax</span></div>
+
+
+
+<div class="viewcode-block" id="compare_cross_sections">
+<a class="viewcode-back" href="../../api.html#pyepics.plotting.compare_cross_sections">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">compare_cross_sections</span><span class="p">(</span>
+    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
+    <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="s2">&quot;ElementID&quot;</span><span class="p">],</span>
+    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">library</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;EEDL&quot;</span><span class="p">,</span>
+    <span class="n">logx</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">logy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compare a single cross-section type across multiple elements.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    client : EPICSClient</span>
+<span class="sd">        Initialised client instance.</span>
+<span class="sd">    elements : sequence of int or str</span>
+<span class="sd">        Elements to compare.</span>
+<span class="sd">    label : str</span>
+<span class="sd">        Cross-section label (e.g. ``&quot;xs_tot&quot;``).</span>
+<span class="sd">    library : str</span>
+<span class="sd">        ``&quot;EEDL&quot;`` or ``&quot;EPDL&quot;``.</span>
+<span class="sd">    logx, logy : bool</span>
+<span class="sd">        Use logarithmic axes.</span>
+<span class="sd">    title : str or None</span>
+<span class="sd">        Plot title.</span>
+<span class="sd">    ax : matplotlib.axes.Axes or None</span>
+<span class="sd">        Existing axes.</span>
+<span class="sd">    show : bool</span>
+<span class="sd">        Call ``plt.show()``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    matplotlib.axes.Axes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">plt</span> <span class="o">=</span> <span class="n">_import_matplotlib</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">energy</span><span class="p">,</span> <span class="n">xs</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_cross_section</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">library</span><span class="o">=</span><span class="n">library</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">_resolve_element</span>
+        <span class="n">z</span><span class="p">,</span> <span class="n">sym</span> <span class="o">=</span> <span class="n">_resolve_element</span><span class="p">(</span><span class="n">elem</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">energy</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">sym</span><span class="si">}</span><span class="s2"> (Z=</span><span class="si">{</span><span class="n">z</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">logx</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xscale</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">logy</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Energy (eV)&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Cross Section (barns)&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> — Element Comparison&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="s2">&quot;small&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">ax</span></div>
+
+
+
+<div class="viewcode-block" id="plot_binding_energies">
+<a class="viewcode-back" href="../../api.html#pyepics.plotting.plot_binding_energies">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_binding_energies</span><span class="p">(</span>
+    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
+    <span class="n">elements</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="s2">&quot;ElementID&quot;</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">subshell</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Plot binding energies vs. atomic number.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    client : EPICSClient</span>
+<span class="sd">        Initialised client instance.</span>
+<span class="sd">    elements : sequence of int or str</span>
+<span class="sd">        Elements to plot.</span>
+<span class="sd">    subshell : str or None</span>
+<span class="sd">        If given, plot only this subshell (e.g. ``&quot;K&quot;``).</span>
+<span class="sd">        Otherwise, plot all subshells with connected lines.</span>
+<span class="sd">    title : str or None</span>
+<span class="sd">        Plot title.</span>
+<span class="sd">    ax : matplotlib.axes.Axes or None</span>
+<span class="sd">        Existing axes.</span>
+<span class="sd">    show : bool</span>
+<span class="sd">        Call ``plt.show()``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    matplotlib.axes.Axes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">plt</span> <span class="o">=</span> <span class="n">_import_matplotlib</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pyepics.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">_resolve_element</span>
+
+    <span class="c1"># Collect data: subshell -&gt; [(Z, BE)]</span>
+    <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">:</span>
+        <span class="n">ep</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_element</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;EADL&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">ep</span><span class="o">.</span><span class="n">atomic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">Z</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">ep</span><span class="o">.</span><span class="n">atomic</span><span class="o">.</span><span class="n">subshells</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">subshell</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">name</span> <span class="o">!=</span> <span class="n">subshell</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">z</span><span class="p">,</span> <span class="n">sub</span><span class="o">.</span><span class="n">binding_energy_eV</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">points</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+        <span class="n">points</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+        <span class="n">zs</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]</span>
+        <span class="n">bes</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">zs</span><span class="p">,</span> <span class="n">bes</span><span class="p">,</span> <span class="s2">&quot;o-&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Atomic Number (Z)&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Binding Energy (eV)&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span> <span class="ow">or</span> <span class="s2">&quot;Subshell Binding Energies vs. Z&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="s2">&quot;x-small&quot;</span><span class="p">,</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;best&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">ax</span></div>
+
+
+
+<div class="viewcode-block" id="plot_shell_binding_energies">
+<a class="viewcode-back" href="../../api.html#pyepics.plotting.plot_shell_binding_energies">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_shell_binding_energies</span><span class="p">(</span>
+    <span class="n">client</span><span class="p">:</span> <span class="s2">&quot;EPICSClient&quot;</span><span class="p">,</span>
+    <span class="n">element</span><span class="p">:</span> <span class="s2">&quot;ElementID&quot;</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ax</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Bar chart of binding energies by subshell for a single element.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    client : EPICSClient</span>
+<span class="sd">        Initialised client instance.</span>
+<span class="sd">    element : int or str</span>
+<span class="sd">        Element identifier.</span>
+<span class="sd">    title : str or None</span>
+<span class="sd">        Plot title.</span>
+<span class="sd">    ax : matplotlib.axes.Axes or None</span>
+<span class="sd">        Existing axes.</span>
+<span class="sd">    show : bool</span>
+<span class="sd">        Call ``plt.show()``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    matplotlib.axes.Axes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">plt</span> <span class="o">=</span> <span class="n">_import_matplotlib</span><span class="p">()</span>
+
+    <span class="n">ep</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_element</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">libraries</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;EADL&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">ep</span><span class="o">.</span><span class="n">atomic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No EADL data for </span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2"> (Z=</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">Z</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+
+    <span class="n">names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ep</span><span class="o">.</span><span class="n">atomic</span><span class="o">.</span><span class="n">subshells</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">bes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ep</span><span class="o">.</span><span class="n">atomic</span><span class="o">.</span><span class="n">subshells</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">binding_energy_eV</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">]</span>
+
+    <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="n">bes</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;steelblue&quot;</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s2">&quot;navy&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Subshell&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Binding Energy (eV)&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2"> (Z=</span><span class="si">{</span><span class="n">ep</span><span class="o">.</span><span class="n">Z</span><span class="si">}</span><span class="s2">) — Subshell Binding Energies&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">45</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">ax</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Melek Derman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

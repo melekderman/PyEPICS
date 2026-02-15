@@ -3,7 +3,7 @@ Data Pipeline
 
 PyEPICS follows a three-step pipeline:
 
-1. **Download** ENDF files from IAEA
+1. **Download** ENDF files from LLNL
 2. **Raw HDF5** — full-fidelity, original grids
 3. **MCDC HDF5** — transport-code optimised
 

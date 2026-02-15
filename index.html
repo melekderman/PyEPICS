@@ -44,7 +44,9 @@
               <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide.html">User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pipeline.html">Data Pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_sources.html">Data Sources</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
@@ -82,6 +84,13 @@
 <li class="toctree-l2"><a class="reference internal" href="getting_started.html#quick-start">Quick Start</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide.html">User Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide.html#querying-a-single-element">Querying a Single Element</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide.html#comparing-multiple-elements">Comparing Multiple Elements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide.html#plotting">Plotting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide.html#reading-generated-hdf5-files">Reading Generated HDF5 Files</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="pipeline.html">Data Pipeline</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="pipeline.html#step-1-download">Step 1: Download</a></li>
 <li class="toctree-l2"><a class="reference internal" href="pipeline.html#step-2-raw-hdf5">Step 2: Raw HDF5</a></li>
@@ -89,22 +98,38 @@
 <li class="toctree-l2"><a class="reference internal" href="pipeline.html#full-pipeline">Full Pipeline</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="data_sources.html">Data Sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data_sources.html#endf-libraries">ENDF Libraries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_sources.html#binding-energies">Binding Energies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_sources.html#physical-constants">Physical Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_sources.html#mf-mt-mapping-tables">MF/MT Mapping Tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_sources.html#reference">Reference</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="api.html#readers">Readers</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#models">Models</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#converters">Converters</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#download">Download</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#exceptions">Exceptions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="api.html#constants">Constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.client">Client API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.plotting">Plotting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.readers.eedl">Readers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.models.records">Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.converters.hdf5">Converters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.io.download">Download</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.exceptions">Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-pyepics.utils.constants">Constants</a></li>
 </ul>
 </li>
 </ul>
 </div>
 <section id="getting-started">
 <h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h2>
-<p>PyEPICS parses EEDL, EPDL, and EADL files from the IAEA EPICS 2023 database
+<p>PyEPICS parses EEDL, EPDL, and EADL files from the LLNL EPICS 2025 database
 and converts them into structured HDF5 files for Monte Carlo transport codes.</p>
 <p>See <a class="reference internal" href="getting_started.html"><span class="doc">Getting Started</span></a> for installation and quick start instructions.</p>
+</section>
+<section id="acknowledgements">
+<h2>Acknowledgements<a class="headerlink" href="#acknowledgements" title="Link to this heading"></a></h2>
+<p>This work was supported by the Center for Advancing the Radiation Resilience
+of Electronics (CARRE), a PSAAP-IV project funded by the Department of Energy,
+grant number: DE-NA0004268.</p>
 </section>
 </section>
 <section id="indices-and-tables">
