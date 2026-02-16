@@ -1,5 +1,6 @@
 # PyEPICS
 
+[![DOI](https://zenodo.org/badge/1027875024.svg)](https://doi.org/10.5281/zenodo.18648203)
 [![CI](https://github.com/melekderman/PyEPICS/actions/workflows/ci.yml/badge.svg)](https://github.com/melekderman/PyEPICS/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
