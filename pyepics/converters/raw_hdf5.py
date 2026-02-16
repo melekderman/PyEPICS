@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -18,9 +18,9 @@ or convert the data with their own tools.
 
 Output Directories
 ------------------
-* ``raw_data/``           — EEDL (electron) raw files
-* ``raw_data_photon/``    — EPDL (photon)  raw files
-* ``raw_data_atomic/``    — EADL (atomic)  raw files
+* ``data/raw/electron/``  — EEDL (electron) raw files
+* ``data/raw/photon/``    — EPDL (photon)  raw files
+* ``data/raw/atomic/``    — EADL (atomic)  raw files
 
 HDF5 Layout — EEDL
 -------------------
@@ -79,7 +79,7 @@ from pyepics.models.records import (
     EPDLDataset,
     FormFactorRecord,
 )
-from pyepics.utils.constants import SUBSHELL_LABELS
+from pyepics.utils.constants import ELECTRON_SUBSHELL_LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ def write_raw_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     if "xs_ion" in xs:
         _write_xs_record(ig.create_group("cross_section/total"), xs["xs_ion"])
 
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         xs_key = f"xs_{shell_label}"
         spec_key = f"spec_{shell_label}"
         if xs_key not in xs:
@@ -243,7 +243,7 @@ def write_raw_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     pg = h5f.create_group("photoelectric")
     if "xs_photoelectric" in xs:
         _write_xs_record(pg.create_group("cross_section/total"), xs["xs_photoelectric"])
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         key = f"xs_pe_{shell_label}"
         if key in xs:
             _write_xs_record(pg.create_group(f"cross_section/{shell_label}"), xs[key])

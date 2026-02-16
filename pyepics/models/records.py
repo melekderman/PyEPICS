@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -39,7 +39,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Atomic-level building blocks

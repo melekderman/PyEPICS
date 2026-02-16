@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -28,7 +28,7 @@ exponent, e.g. ``" 1.23456-03"``).
 
 References
 ----------
-.. [1] ENDF-6 Formats Manual (ENDF-102), BNL-90365-2009 Rev. 2, §0.6.
+- ENDF-6 Formats Manual (ENDF-102), BNL-90365-2009 Rev. 2, §0.6.
 """
 
 from __future__ import annotations
@@ -464,7 +464,7 @@ def small_angle_eta(Z: int, energy_eV: np.ndarray) -> np.ndarray:
        electrons and positrons by atoms, positive ions and molecules.
        *Computer Physics Communications*, 165(2), 157–190.
     """
-    from pyepics.utils.constants import FINE_STRUCTURE, ELECTRON_MASS
+    from pyepics.utils.constants import ELECTRON_MASS, FINE_STRUCTURE
 
     alpha = FINE_STRUCTURE
     mec2 = ELECTRON_MASS  # MeV

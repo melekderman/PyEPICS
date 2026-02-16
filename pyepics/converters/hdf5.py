@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -61,8 +61,8 @@ are stored as group attributes on the ``Z_{ZZZ}`` group.
 
 References
 ----------
-.. [1] HDF5 best practices, The HDF Group.
-.. [2] ENDF-6 Formats Manual (ENDF-102).
+- HDF5 best practices, The HDF Group.
+- ENDF-6 Formats Manual (ENDF-102).
 """
 
 from __future__ import annotations
@@ -88,7 +88,7 @@ from pyepics.models.records import (
     EPDLDataset,
 )
 from pyepics.readers.base import DatasetModel
-from pyepics.utils.constants import SUBSHELL_LABELS
+from pyepics.utils.constants import ELECTRON_SUBSHELL_LABELS
 from pyepics.utils.parsing import (
     build_pdf,
     linear_interpolation,
@@ -154,10 +154,9 @@ def _create_xs_dataset(
 def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     """Write an EEDL dataset to the ``/EEDL/Z_{ZZZ}`` group
 
-    Reproduces the MCDC-compatible layout used by the original PyEEDL
-    pipeline, including interpolation of all cross sections onto a
-    common energy grid and computation of small-angle scattering
-    cosine distributions.
+    Produces the MCDC-compatible layout, including interpolation of all
+    cross sections onto a common energy grid and computation of
+    small-angle scattering cosine distributions.
 
     Parameters
     ----------
@@ -184,6 +183,7 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
 
     # Helper to interpolate onto grid
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(xs_energy_grid, xs[key].energy, xs[key].cross_section)
         return np.zeros_like(xs_energy_grid)
@@ -255,7 +255,7 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     _create_xs_dataset(ion_grp, "xs", xs_ion_total, "barns")
     subs_grp = ion_grp.create_group("subshells")
 
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         xs_key = f"xs_{shell_label}"
         spec_key = f"spec_{shell_label}"
 
@@ -306,6 +306,7 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     xs_energy_grid = xs["xs_tot"].energy
 
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(xs_energy_grid, xs[key].energy, xs[key].cross_section)
         return np.zeros_like(xs_energy_grid)
@@ -336,7 +337,7 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     pe_grp = root.create_group("photoelectric")
     _create_xs_dataset(pe_grp, "xs", interp("xs_photoelectric"), "barns")
     pe_subs = pe_grp.create_group("subshells")
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         key = f"xs_pe_{shell_label}"
         if key not in xs:
             continue
@@ -516,7 +517,7 @@ def convert_dataset_to_hdf5(
     --------
     >>> convert_dataset_to_hdf5(
     ...     "EEDL",
-    ...     "eedl/EEDL.ZA026000.endf",
+    ...     "data/endf/eedl/EEDL.ZA026000.endf",
     ...     "output/Fe.h5",
     ...     overwrite=True,
     ... )
@@ -536,8 +537,8 @@ def convert_dataset_to_hdf5(
         )
 
     # Select reader
-    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.eadl import EADLReader
+    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.epdl import EPDLReader
 
     reader_map = {
@@ -580,8 +581,8 @@ def convert_dataset_to_hdf5(
 
 def _get_reader(dataset_type: str):
     """Return the correct reader class for a dataset type."""
-    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.eadl import EADLReader
+    from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.epdl import EPDLReader
     return {"EEDL": EEDLReader, "EADL": EADLReader, "EPDL": EPDLReader}[dataset_type]
 
@@ -615,12 +616,12 @@ def create_raw_hdf5(
 
     Examples
     --------
-    >>> create_raw_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "raw_data/Fe.h5")
+    >>> create_raw_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/raw/electron/Fe.h5")
     """
     from pyepics.converters.raw_hdf5 import (
+        write_raw_eadl,
         write_raw_eedl,
         write_raw_epdl,
-        write_raw_eadl,
     )
 
     writers = {"EEDL": write_raw_eedl, "EPDL": write_raw_epdl, "EADL": write_raw_eadl}
@@ -677,12 +678,12 @@ def create_mcdc_hdf5(
 
     Examples
     --------
-    >>> create_mcdc_hdf5("EEDL", "eedl/EEDL.ZA026000.endf", "mcdc_data/Fe.h5")
+    >>> create_mcdc_hdf5("EEDL", "data/endf/eedl/EEDL.ZA026000.endf", "data/mcdc/electron/Fe.h5")
     """
     from pyepics.converters.mcdc_hdf5 import (
+        write_mcdc_eadl,
         write_mcdc_eedl,
         write_mcdc_epdl,
-        write_mcdc_eadl,
     )
 
     writers = {"EEDL": write_mcdc_eedl, "EPDL": write_mcdc_epdl, "EADL": write_mcdc_eadl}
@@ -708,3 +709,85 @@ def create_mcdc_hdf5(
         raise ConversionError(f"Failed to write MCDC HDF5 {out}: {exc}") from exc
 
     logger.info("Wrote MCDC %s HDF5: %s", dataset_type, out)
+
+
+def create_combined_mcdc_hdf5(
+    Z: int,
+    output_path: Path | str,
+    *,
+    eedl_path: Path | str | None = None,
+    epdl_path: Path | str | None = None,
+    eadl_path: Path | str | None = None,
+    validate: bool = True,
+    overwrite: bool = False,
+) -> None:
+    """Create a **single** MCDC HDF5 file containing electron, photon, and atomic data.
+
+    Each element gets one file (e.g. ``Fe.h5``) with up to three
+    top-level groups: ``electron_reactions``, ``photon_reactions``,
+    and ``atomic_relaxation``.
+
+    Parameters
+    ----------
+    Z : int
+        Atomic number (used for logging only; actual Z comes from the
+        parsed data).
+    output_path : Path | str
+        Path for the combined output HDF5 file.
+    eedl_path : Path | str | None
+        Path to the EEDL ENDF source file (electron).
+    epdl_path : Path | str | None
+        Path to the EPDL ENDF source file (photon).
+    eadl_path : Path | str | None
+        Path to the EADL ENDF source file (atomic relaxation).
+    validate : bool, optional
+        Post-parse validation.  Default ``True``.
+    overwrite : bool, optional
+        Overwrite existing file.  Default ``False``.
+
+    Examples
+    --------
+    >>> create_combined_mcdc_hdf5(
+    ...     26, "data/mcdc/Fe.h5",
+    ...     eedl_path="data/endf/eedl/EEDL.ZA026000.endf",
+    ...     epdl_path="data/endf/epdl/EPDL.ZA026000.endf",
+    ...     eadl_path="data/endf/eadl/EADL.ZA026000.endf",
+    ... )
+    """
+    from pyepics.converters.mcdc_hdf5 import write_mcdc_combined
+    from pyepics.readers.eadl import EADLReader
+    from pyepics.readers.eedl import EEDLReader
+    from pyepics.readers.epdl import EPDLReader
+
+    out = Path(output_path)
+    if out.exists() and not overwrite:
+        raise ConversionError(f"Output file {out} already exists and overwrite=False.")
+
+    eedl_ds = EEDLReader().read(Path(eedl_path), validate=validate) if eedl_path else None
+    epdl_ds = EPDLReader().read(Path(epdl_path), validate=validate) if epdl_path else None
+    eadl_ds = EADLReader().read(Path(eadl_path), validate=validate) if eadl_path else None
+
+    if not any([eedl_ds, epdl_ds, eadl_ds]):
+        raise ConversionError(
+            f"No ENDF source files found for Z={Z}. "
+            "At least one of eedl_path, epdl_path, eadl_path must be provided."
+        )
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = "w" if overwrite else "w-"
+        with h5py.File(str(out), mode) as h5f:
+            write_mcdc_combined(h5f, eedl=eedl_ds, epdl=epdl_ds, eadl=eadl_ds)
+    except Exception as exc:
+        if isinstance(exc, ConversionError):
+            raise
+        raise ConversionError(f"Failed to write combined MCDC HDF5 {out}: {exc}") from exc
+
+    libs = []
+    if eedl_ds:
+        libs.append("EEDL")
+    if epdl_ds:
+        libs.append("EPDL")
+    if eadl_ds:
+        libs.append("EADL")
+    logger.info("Wrote combined MCDC HDF5 (%s): %s", "+".join(libs), out)

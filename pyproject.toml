@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "epics"
+version = "1.0.0"
+description = "Python library for reading and converting EPICS (Electron Photon Interaction Cross Sections) nuclear data"
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Melek Derman", email = "melekderman@example.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Typing :: Typed",
+]
+keywords = ["nuclear data", "EEDL", "EPDL", "EADL", "EPICS", "ENDF", "HDF5", "Monte Carlo"]
+
+dependencies = [
+    "numpy>=1.24",
+    "h5py>=3.8",
+    "endf>=0.1",
+]
+
+[project.optional-dependencies]
+download = [
+    "requests>=2.28",
+    "beautifulsoup4>=4.11",
+]
+pandas = [
+    "pandas>=2.0",
+]
+plot = [
+    "matplotlib>=3.7",
+]
+all = [
+    "epics[download,pandas,plot]",
+]
+dev = [
+    "epics[all]",
+    "pytest>=7.0",
+    "ruff>=0.4",
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
+    "myst-parser>=3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/melekderman/PyEPICS"
+Documentation = "https://pyepics.readthedocs.io"
+Repository = "https://github.com/melekderman/PyEPICS"
+Issues = "https://github.com/melekderman/PyEPICS/issues"
+
+[project.scripts]
+epics = "pyepics.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pyepics*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning:pyepics.pyeedl_compat",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]

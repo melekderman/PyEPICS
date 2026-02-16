@@ -1,6 +1,8 @@
 numpy
 h5py
 endf
-sphinx
-sphinx-rtd-theme
-myst-parser
+sphinx>=7.0
+sphinx-rtd-theme>=2.0
+myst-parser>=3.0
+matplotlib
+pandas

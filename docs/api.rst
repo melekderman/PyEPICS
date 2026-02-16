@@ -1,6 +1,20 @@
 API Reference
 =============
 
+Client API
+----------
+
+.. automodule:: pyepics.client
+   :members:
+   :undoc-members:
+
+Plotting
+--------
+
+.. automodule:: pyepics.plotting
+   :members:
+   :undoc-members:
+
 Readers
 -------
 

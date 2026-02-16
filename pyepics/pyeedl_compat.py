@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -36,54 +36,57 @@ _warnings.warn(
 )
 
 # ── Version ─────────────────────────────────────────────────────────────
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 # ── Data constants & mappings ───────────────────────────────────────────
+# ── Converter ──────────────────────────────────────────────────────────
+from pyepics.converters.hdf5 import convert_dataset_to_hdf5  # noqa: E402, F401
+from pyepics.readers.eadl import EADLReader  # noqa: E402, F401
+
+# ── Readers (thin wrappers returning old-style dicts are NOT provided;
+#    users of the legacy functions should call readers directly) ─────────
+from pyepics.readers.eedl import EEDLReader  # noqa: E402, F401
+from pyepics.readers.epdl import EPDLReader  # noqa: E402, F401
 from pyepics.utils.constants import (  # noqa: E402, F401
-    PERIODIC_TABLE,
-    # Electron (EEDL)
-    MF_MT,
-    SECTIONS_ABBREVS,
-    MF23,
-    MF26,
-    SUBSHELL_LABELS,
-    # Photon (EPDL)
-    PHOTON_MF_MT,
-    PHOTON_SECTIONS_ABBREVS,
-    MF27,
     # Atomic (EADL)
     ATOMIC_MF_MT,
     ATOMIC_SECTIONS_ABBREVS,
-    MF28,
-    SUBSHELL_DESIGNATORS,
-    SUBSHELL_DESIGNATORS_INV,
+    BARN_TO_CM2,
+    ELECTRON_CHARGE,
+    ELECTRON_MASS,
+    # Electron (EEDL) — canonical names
+    ELECTRON_MF_MT,
+    ELECTRON_SECTIONS_ABBREVS,
+    ELECTRON_SUBSHELL_LABELS,
     # Physical constants
     FINE_STRUCTURE,
-    ELECTRON_MASS,
-    BARN_TO_CM2,
+    MF23,
+    MF26,
+    MF27,
+    MF28,
+    # Electron (EEDL) — backward-compatible aliases
+    MF_MT,
+    PERIODIC_TABLE,
+    # Photon (EPDL)
+    PHOTON_MF_MT,
+    PHOTON_SECTIONS_ABBREVS,
     PLANCK_CONSTANT,
+    SECTIONS_ABBREVS,
     SPEED_OF_LIGHT,
-    ELECTRON_CHARGE,
+    SUBSHELL_DESIGNATORS,
+    SUBSHELL_DESIGNATORS_INV,
+    SUBSHELL_LABELS,
 )
 
 # ── Utility / math functions ───────────────────────────────────────────
 from pyepics.utils.parsing import (  # noqa: E402, F401
+    build_pdf,
     float_endf,
     int_endf,
     linear_interpolation,
-    build_pdf,
     small_angle_eta,
     small_angle_scattering_cosine,
 )
-
-# ── Readers (thin wrappers returning old-style dicts are NOT provided;
-#    users of the legacy functions should call readers directly) ─────────
-from pyepics.readers.eedl import EEDLReader    # noqa: E402, F401
-from pyepics.readers.epdl import EPDLReader    # noqa: E402, F401
-from pyepics.readers.eadl import EADLReader    # noqa: E402, F401
-
-# ── Converter ──────────────────────────────────────────────────────────
-from pyepics.converters.hdf5 import convert_dataset_to_hdf5  # noqa: E402, F401
 
 __all__ = [
     # Version
@@ -94,12 +97,16 @@ __all__ = [
     "EADLReader",
     # Converter (new API)
     "convert_dataset_to_hdf5",
-    # Data mappings - Electron
+    # Data mappings - Electron (canonical)
+    "ELECTRON_MF_MT",
+    "ELECTRON_SECTIONS_ABBREVS",
+    "ELECTRON_SUBSHELL_LABELS",
+    # Data mappings - Electron (backward-compatible aliases)
     "MF_MT",
     "SECTIONS_ABBREVS",
+    "SUBSHELL_LABELS",
     "MF23",
     "MF26",
-    "SUBSHELL_LABELS",
     # Data mappings - Photon
     "PHOTON_MF_MT",
     "PHOTON_SECTIONS_ABBREVS",

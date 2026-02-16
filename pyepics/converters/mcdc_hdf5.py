@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -28,9 +28,9 @@ transport code.  These differ from the "raw" format in several ways:
 
 Output Directories
 ------------------
-* ``mcdc_data/``             — EEDL (electron)
-* ``mcdc_data_photon/``      — EPDL (photon)
-* ``mcdc_data_atomic/``      — EADL (atomic)
+* ``data/mcdc/electron/``    — EEDL (electron)
+* ``data/mcdc/photon/``      — EPDL (photon)
+* ``data/mcdc/atomic/``      — EADL (atomic)
 
 See Also
 --------
@@ -56,7 +56,7 @@ from pyepics.models.records import (
     EEDLDataset,
     EPDLDataset,
 )
-from pyepics.utils.constants import SUBSHELL_LABELS
+from pyepics.utils.constants import ELECTRON_SUBSHELL_LABELS
 from pyepics.utils.parsing import (
     build_pdf,
     linear_interpolation,
@@ -83,10 +83,14 @@ def _create_xs_dataset(
 
 
 def _write_mcdc_metadata(h5f: h5py.File, dataset) -> None:
-    """Write top-level metadata expected by MC/DC."""
-    h5f.create_dataset("atomic_weight_ratio", data=np.float64(dataset.atomic_weight_ratio))
-    h5f.create_dataset("atomic_number", data=np.int64(dataset.Z))
-    h5f.create_dataset("element_name", data=dataset.symbol)
+    """Write top-level metadata expected by MC/DC.
+
+    Safe to call multiple times — skips datasets that already exist.
+    """
+    if "atomic_number" not in h5f:
+        h5f.create_dataset("atomic_weight_ratio", data=np.float64(dataset.atomic_weight_ratio))
+        h5f.create_dataset("atomic_number", data=np.int64(dataset.Z))
+        h5f.create_dataset("element_name", data=dataset.symbol)
 
 
 # ---------------------------------------------------------------------------
@@ -125,6 +129,7 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
 
     # Interpolation helper
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(
                 xs_energy_grid, xs[key].energy, xs[key].cross_section,
@@ -198,7 +203,7 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     _create_xs_dataset(ion_grp, "xs", xs_ion_total, "barns")
     subs_grp = ion_grp.create_group("subshells")
 
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         xs_key = f"xs_{shell_label}"
         spec_key = f"spec_{shell_label}"
         if xs_key not in xs:
@@ -258,6 +263,7 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     xs_energy_grid = xs["xs_tot"].energy
 
     def interp(key: str) -> np.ndarray:
+        """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(
                 xs_energy_grid, xs[key].energy, xs[key].cross_section,
@@ -290,7 +296,7 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     pe_grp = root.create_group("photoelectric")
     _create_xs_dataset(pe_grp, "xs", interp("xs_photoelectric"), "barns")
     pe_subs = pe_grp.create_group("subshells")
-    for mt, shell_label in SUBSHELL_LABELS.items():
+    for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         key = f"xs_pe_{shell_label}"
         if key not in xs:
             continue
@@ -404,3 +410,61 @@ def write_mcdc_eadl(h5f: h5py.File, dataset: EADLDataset) -> None:
         )
 
     logger.debug("Wrote MCDC EADL for Z=%d (%d subshells)", dataset.Z, dataset.n_subshells)
+
+
+# ---------------------------------------------------------------------------
+# Combined (all-in-one) MCDC writer
+# ---------------------------------------------------------------------------
+
+def write_mcdc_combined(
+    h5f: h5py.File,
+    *,
+    eedl: EEDLDataset | None = None,
+    epdl: EPDLDataset | None = None,
+    eadl: EADLDataset | None = None,
+) -> None:
+    """Write a combined MCDC HDF5 file with electron, photon, and atomic data.
+
+    Produces a single file per element containing up to three top-level
+    groups (``electron_reactions``, ``photon_reactions``,
+    ``atomic_relaxation``) plus shared metadata.
+
+    Parameters
+    ----------
+    h5f : h5py.File
+        Open HDF5 file handle (write mode).
+    eedl : EEDLDataset or None
+        Parsed EEDL dataset (electron).
+    epdl : EPDLDataset or None
+        Parsed EPDL dataset (photon).
+    eadl : EADLDataset or None
+        Parsed EADL dataset (atomic relaxation).
+
+    Raises
+    ------
+    ValueError
+        If no dataset is provided.
+    """
+    first = eedl or epdl or eadl
+    if first is None:
+        raise ValueError("At least one dataset (eedl, epdl, or eadl) must be provided.")
+
+    _write_mcdc_metadata(h5f, first)
+
+    if eedl is not None:
+        write_mcdc_eedl(h5f, eedl)
+        logger.debug("  [combined] electron_reactions written")
+
+    if epdl is not None:
+        write_mcdc_epdl(h5f, epdl)
+        logger.debug("  [combined] photon_reactions written")
+
+    if eadl is not None:
+        write_mcdc_eadl(h5f, eadl)
+        logger.debug("  [combined] atomic_relaxation written")
+
+    logger.info(
+        "Wrote combined MCDC HDF5 for Z=%d (%s)",
+        first.Z,
+        first.symbol,
+    )

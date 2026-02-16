@@ -2,11 +2,11 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
-I/O utilities for downloading EPICS datasets from IAEA
+I/O utilities for downloading EPICS 2025 datasets from LLNL
 
 .. note::
    The download functionality is a stub reserved for future

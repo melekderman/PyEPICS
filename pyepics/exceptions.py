@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -98,7 +98,7 @@ class ConversionError(PyEPICSError):
 
 
 class DownloadError(PyEPICSError):
-    """Raised when dataset download from IAEA fails
+    """Raised when dataset download from LLNL fails
 
     Reserved for future use by the ``io.download`` module.  Covers HTTP
     errors, connection timeouts, and checksum mismatches.

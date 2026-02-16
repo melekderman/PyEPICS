@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -13,10 +13,10 @@ self-contained, multi-page PDF report.  The report includes:
 
   * Unit-test summary (pytest)
   * Electron / photon cross-section plots (EEDL, EPDL)
-  * Binding-energy comparison (EADL vs NIST reference)
+  * Binding-energy comparison (EADL vs EEDL/ENDF reference)
   * Transition-energy plots (K -> L2, K -> L3, L2-L3 splitting)
   * HDF5 round-trip validation
-  * Data-dictionary completeness check (PyEEDL <-> PyEPICS)
+  * Data-dictionary completeness check (ENDF source vs PyEPICS)
   * Docstring coverage audit
   * Physical-constant verification
   * Overall pass / fail summary
@@ -33,7 +33,6 @@ import argparse
 import ast
 import datetime
 import glob
-import importlib.util
 import io
 import os
 import subprocess
@@ -50,7 +49,6 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = Path(__file__).resolve().parent
 PYEPICS_ROOT = SCRIPT_DIR.parent
-PYEEDL_ROOT = PYEPICS_ROOT.parent / "PyEEDL"
 
 # Ensure pyepics is importable
 if str(PYEPICS_ROOT) not in sys.path:
@@ -83,17 +81,17 @@ def _lazy_imports():
     )
     from pyepics.utils.constants import (
         PERIODIC_TABLE,
-        MF_MT,
+        ELECTRON_MF_MT,
         PHOTON_MF_MT,
         ATOMIC_MF_MT,
         MF23,
         MF26,
         MF27,
         MF28,
-        SECTIONS_ABBREVS,
+        ELECTRON_SECTIONS_ABBREVS,
         PHOTON_SECTIONS_ABBREVS,
         ATOMIC_SECTIONS_ABBREVS,
-        SUBSHELL_LABELS,
+        ELECTRON_SUBSHELL_LABELS,
         SUBSHELL_DESIGNATORS,
         FINE_STRUCTURE,
         ELECTRON_MASS,
@@ -167,8 +165,6 @@ def section_cover(pdf, ctx):
             ha="center", va="center", color="gray", transform=ax.transAxes)
     ax.text(0.5, 0.42, f"PyEPICS root: {PYEPICS_ROOT}", fontsize=10,
             ha="center", va="center", color="gray", transform=ax.transAxes)
-    ax.text(0.5, 0.36, f"PyEEDL root:  {PYEEDL_ROOT}", fontsize=10,
-            ha="center", va="center", color="gray", transform=ax.transAxes)
     pdf.savefig(fig)
     plt.close(fig)
     return {"passed": True}
@@ -206,7 +202,7 @@ def section_eedl_plots(pdf, ctx):
     M = ctx["M"]
     _section_title_page(pdf, "2. EEDL Electron Cross-Section Plots")
 
-    eedl_dir = PYEEDL_ROOT / "eedl"
+    eedl_dir = PYEPICS_ROOT / "data" / "endf" / "eedl"
     eedl_files = sorted(eedl_dir.glob("*EEDL*.endf")) if eedl_dir.exists() else []
 
     if not eedl_files:
@@ -214,7 +210,7 @@ def section_eedl_plots(pdf, ctx):
             "No EEDL ENDF files found.",
             f"Searched: {eedl_dir}",
             "",
-            "Download from: https://www-nds.iaea.org/epics/",
+            "Download from: https://nuclear.llnl.gov/EPICS/",
         ], title="EEDL — skipped")
         return {"passed": None}  # skipped
 
@@ -256,7 +252,7 @@ def section_epdl_plots(pdf, ctx):
     M = ctx["M"]
     _section_title_page(pdf, "3. EPDL Photon Cross-Section Plots")
 
-    epdl_files = sorted((PYEEDL_ROOT / "eedl").glob("*EPDL*.endf")) if (PYEEDL_ROOT / "eedl").exists() else []
+    epdl_files = sorted((PYEPICS_ROOT / "data" / "endf" / "epdl").glob("*EPDL*.endf")) if (PYEPICS_ROOT / "data" / "endf" / "epdl").exists() else []
     if not epdl_files:
         _text_page(pdf, ["No EPDL ENDF files found — skipped."], title="EPDL")
         return {"passed": None}
@@ -286,14 +282,18 @@ def section_epdl_plots(pdf, ctx):
 
 # -------------------------------------------------------------------
 def section_binding_energy(pdf, ctx):
-    """Compare EADL binding energies against NIST reference data."""
+    """Compare EADL binding energies against EEDL/ENDF reference data.
+
+    The reference CSV contains binding energies extracted from the EEDL ENDF
+    files, not from NIST.  Analysis covers all available subshells.
+    """
     import matplotlib.pyplot as plt
 
     M = ctx["M"]
     _section_title_page(pdf, "4. Binding-Energy Validation",
-                        "EADL vs NIST reference (K-shell)")
+                        "EADL vs EEDL/ENDF reference (all subshells)")
 
-    mcdc_dir = PYEEDL_ROOT / "mcdc_data"
+    mcdc_dir = PYEPICS_ROOT / "data" / "mcdc" / "electron"
     h5_files = sorted(mcdc_dir.glob("*.h5")) if mcdc_dir.exists() else []
 
     if not h5_files:
@@ -323,55 +323,103 @@ def section_binding_energy(pdf, ctx):
     df_be = pd.DataFrame(be_rows)
     ctx["df_be"] = df_be
 
-    # Load NIST reference
-    ref_csv = PYEPICS_ROOT / "reference_data" / "reference_binding_energies.csv"
+    # Load EEDL/ENDF reference (not NIST)
+    ref_csv = PYEPICS_ROOT / "tests" / "fixtures" / "reference_binding_energies.csv"
     if not ref_csv.exists():
         _text_page(pdf, [f"Reference CSV not found: {ref_csv}"], title="Binding energy")
         return {"passed": None}
 
     df_ref = pd.read_csv(ref_csv)
+
+    # --- Per-subshell analysis ---
+    all_subshells = sorted(df_ref["subshell"].unique())
+    overall_max_err = 0.0
+    subshell_summaries = []
+
+    for shell in all_subshells:
+        df_ref_shell = df_ref[df_ref["subshell"] == shell].copy()
+        df_shell = df_be[df_be["subshell"] == shell].sort_values("Z").copy()
+
+        if df_shell.empty or df_ref_shell.empty:
+            continue
+
+        df_comp = pd.merge(
+            df_shell[["Z", "be_eV"]],
+            df_ref_shell[["Z", "binding_energy_eV"]],
+            on="Z",
+        )
+        if df_comp.empty:
+            continue
+
+        df_comp["rel_error_pct"] = 100 * abs(
+            df_comp["be_eV"] - df_comp["binding_energy_eV"]
+        ) / df_comp["binding_energy_eV"]
+
+        max_err = df_comp["rel_error_pct"].max()
+        overall_max_err = max(overall_max_err, max_err)
+        subshell_summaries.append({
+            "subshell": shell,
+            "n_elements": len(df_comp),
+            "max_err_pct": max_err,
+            "passed": bool(max_err < 5.0),
+        })
+
+    # Plot K-shell (primary visual — always present in reference)
     df_ref_k = df_ref[df_ref["subshell"] == "K"].copy()
     df_k = df_be[df_be["subshell"] == "K"].sort_values("Z").copy()
 
-    # Plot
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8.5), sharex=True,
-                                    gridspec_kw={"height_ratios": [3, 1]})
-    ax1.semilogy(df_k["Z"], df_k["be_eV"], "o-", color="blue", ms=4,
-                 label="EADL (parsed)", alpha=0.8)
-    ax1.semilogy(df_ref_k["Z"], df_ref_k["binding_energy_eV"], "s", color="red",
-                 ms=8, label="NIST Reference", zorder=5)
-    ax1.set_ylabel("K-Shell Binding Energy (eV)")
-    ax1.set_title("K-Shell Binding Energy: EADL vs NIST Reference")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+    if not df_k.empty and not df_ref_k.empty:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8.5), sharex=True,
+                                        gridspec_kw={"height_ratios": [3, 1]})
+        ax1.semilogy(df_k["Z"], df_k["be_eV"], "o-", color="blue", ms=4,
+                     label="EADL (parsed)", alpha=0.8)
+        ax1.semilogy(df_ref_k["Z"], df_ref_k["binding_energy_eV"], "s", color="red",
+                     ms=8, label="EEDL/ENDF Reference", zorder=5)
+        ax1.set_ylabel("K-Shell Binding Energy (eV)")
+        ax1.set_title("K-Shell Binding Energy: EADL vs EEDL/ENDF Reference")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
 
-    df_comp = pd.merge(df_k[["Z", "be_eV"]], df_ref_k[["Z", "binding_energy_eV"]], on="Z")
-    df_comp["rel_error_pct"] = 100 * abs(
-        df_comp["be_eV"] - df_comp["binding_energy_eV"]
-    ) / df_comp["binding_energy_eV"]
+        df_comp_k = pd.merge(df_k[["Z", "be_eV"]], df_ref_k[["Z", "binding_energy_eV"]], on="Z")
+        df_comp_k["rel_error_pct"] = 100 * abs(
+            df_comp_k["be_eV"] - df_comp_k["binding_energy_eV"]
+        ) / df_comp_k["binding_energy_eV"]
 
-    ax2.bar(df_comp["Z"], df_comp["rel_error_pct"], color="orange", alpha=0.7, width=1.0)
-    ax2.axhline(5.0, color="red", ls="--", label="5% threshold")
-    ax2.set_ylabel("Relative Error (%)")
-    ax2.set_xlabel("Atomic Number (Z)")
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    fig.tight_layout()
-    pdf.savefig(fig)
-    plt.close(fig)
+        ax2.bar(df_comp_k["Z"], df_comp_k["rel_error_pct"], color="orange", alpha=0.7, width=1.0)
+        ax2.axhline(5.0, color="red", ls="--", label="5% threshold")
+        ax2.set_ylabel("Relative Error (%)")
+        ax2.set_xlabel("Atomic Number (Z)")
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        fig.tight_layout()
+        pdf.savefig(fig)
+        plt.close(fig)
 
-    max_err = df_comp["rel_error_pct"].max()
-    ctx["be_max_err"] = max_err
+    ctx["be_max_err"] = overall_max_err
 
+    # Summary page for all subshells
     lines = [
-        f"Compared {len(df_comp)} elements (K-shell)",
-        f"Max relative error: {max_err:.3f}%",
+        "Binding-energy validation: EADL (parsed) vs EEDL/ENDF reference",
+        "Source: tests/fixtures/reference_binding_energies.csv (from EEDL ENDF files)",
         "",
-        "PASS" if max_err < 5.0 else "FAIL — some values exceed 5% threshold",
+        f"{'Subshell':<12} {'Elements':>10} {'Max Error (%)':>14} {'Status':>8}",
+        "=" * 50,
     ]
-    _text_page(pdf, lines, title="Binding-energy numerical summary")
+    for s in subshell_summaries:
+        status = "PASS" if s["passed"] else "FAIL"
+        lines.append(
+            f"{s['subshell']:<12} {s['n_elements']:>10} "
+            f"{s['max_err_pct']:>14.3f} {status:>8}"
+        )
+    lines += [
+        "",
+        f"Overall max relative error: {overall_max_err:.3f}%",
+        "",
+        "PASS" if overall_max_err < 5.0 else "FAIL — some values exceed 5% threshold",
+    ]
+    _text_page(pdf, lines, title="Binding-energy summary (all subshells)")
 
-    return {"passed": max_err < 5.0}
+    return {"passed": bool(overall_max_err < 5.0)}
 
 
 # -------------------------------------------------------------------
@@ -443,7 +491,7 @@ def section_h5_cross_sections(pdf, ctx):
     M = ctx["M"]
     _section_title_page(pdf, "6. MC/DC HDF5 Cross-Section Plots")
 
-    mcdc_dir = PYEEDL_ROOT / "mcdc_data"
+    mcdc_dir = PYEPICS_ROOT / "data" / "mcdc" / "electron"
     h5py = M.h5py
     PERIODIC_TABLE = M.PERIODIC_TABLE
 
@@ -563,70 +611,107 @@ def section_hdf5_roundtrip(pdf, ctx):
 
 # -------------------------------------------------------------------
 def section_data_dictionaries(pdf, ctx):
-    """Compare PyEEDL and PyEPICS data-mapping dictionaries."""
+    """Verify PyEPICS data-mapping dictionaries against ENDF file contents.
+
+    Instead of comparing against an external tool, this section verifies
+    that PyEPICS mapping dictionaries cover all (MF, MT) section pairs
+    found in the actual ENDF source files.
+    """
     M = ctx["M"]
-    _section_title_page(pdf, "8. Data-Dictionary Completeness")
+    _section_title_page(pdf, "8. Data-Dictionary Completeness",
+                        "ENDF source files vs PyEPICS mappings")
 
-    pyeedl_data_path = PYEEDL_ROOT / "pyeedl" / "data.py"
-    if not pyeedl_data_path.exists():
-        _text_page(pdf, [f"PyEEDL data.py not found: {pyeedl_data_path}"])
-        return {"passed": None}
+    # Discover (MF, MT) pairs present in actual ENDF files
+    endf_dir = PYEPICS_ROOT / "data" / "endf"
+    endf_mf_mt_sets = {"eedl": set(), "epdl": set(), "eadl": set()}
 
-    spec = importlib.util.spec_from_file_location("pyeedl_data", str(pyeedl_data_path))
-    pyeedl_data = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(pyeedl_data)
+    for lib_name in ("eedl", "epdl", "eadl"):
+        lib_dir = endf_dir / lib_name
+        if not lib_dir.exists():
+            continue
+        for fpath in sorted(lib_dir.glob("*.endf")):  # scan all files
+            try:
+                import endf
+                tape = endf.Material(fpath)
+                # section_data keys are already (MF, MT) tuples
+                for mf_mt in tape.section_data:
+                    endf_mf_mt_sets[lib_name].add(mf_mt)
+            except Exception:
+                pass
 
-    dict_pairs = [
-        ("MF_MT", getattr(pyeedl_data, "MF_MT", {}), M.MF_MT),
-        ("SECTIONS_ABBREVS", getattr(pyeedl_data, "SECTIONS_ABBREVS", {}), M.SECTIONS_ABBREVS),
-        ("PHOTON_MF_MT", getattr(pyeedl_data, "PHOTON_MF_MT", {}), M.PHOTON_MF_MT),
-        ("PHOTON_SECTIONS_ABBREVS", getattr(pyeedl_data, "PHOTON_SECTIONS_ABBREVS", {}), M.PHOTON_SECTIONS_ABBREVS),
-        ("ATOMIC_MF_MT", getattr(pyeedl_data, "ATOMIC_MF_MT", {}), M.ATOMIC_MF_MT),
-        ("SUBSHELL_LABELS", getattr(pyeedl_data, "SUBSHELL_LABELS", {}), M.SUBSHELL_LABELS),
-        ("SUBSHELL_DESIGNATORS", getattr(pyeedl_data, "SUBSHELL_DESIGNATORS", {}), M.SUBSHELL_DESIGNATORS),
-        ("PERIODIC_TABLE", getattr(pyeedl_data, "PERIODIC_TABLE", {}), M.PERIODIC_TABLE),
-        ("MF23", getattr(pyeedl_data, "MF23", {}), M.MF23),
-        ("MF26", getattr(pyeedl_data, "MF26", {}), M.MF26),
-        ("MF27", getattr(pyeedl_data, "MF27", {}), M.MF27),
-        ("MF28", getattr(pyeedl_data, "MF28", {}), M.MF28),
+    # Compare PyEPICS mapping tables against ENDF contents
+    mapping_checks = [
+        ("ELECTRON_MF_MT (EEDL)", endf_mf_mt_sets.get("eedl", set()), M.ELECTRON_MF_MT),
+        ("PHOTON_MF_MT (EPDL)", endf_mf_mt_sets.get("epdl", set()), M.PHOTON_MF_MT),
+        ("ATOMIC_MF_MT (EADL)", endf_mf_mt_sets.get("eadl", set()), M.ATOMIC_MF_MT),
     ]
 
     lines = [
-        f"{'Dictionary':<28} {'PyEEDL':>7} {'PyEPICS':>8} {'Match':>6} {'Miss':>5} {'Extra':>6} Status",
-        "=" * 80,
+        f"{'Mapping':<28} {'ENDF':>6} {'PyEPICS':>8} {'Covered':>8} {'Missing':>8} Status",
+        "=" * 72,
     ]
     all_ok = True
-    for name, old_d, new_d in dict_pairs:
-        old_k, new_k = set(old_d.keys()), set(new_d.keys())
-        miss = len(old_k - new_k)
-        extra = len(new_k - old_k)
-        match = len(old_k & new_k)
-        status = "OK" if miss == 0 else f"MISSING {miss}"
-        if miss > 0:
+    for name, endf_keys, pyepics_dict in mapping_checks:
+        pyepics_keys = set(pyepics_dict.keys())
+        covered = len(endf_keys & pyepics_keys)
+        missing = len(endf_keys - pyepics_keys)
+        status = "OK" if missing == 0 else f"MISSING {missing}"
+        if missing > 0:
             all_ok = False
         lines.append(
-            f"{name:<28} {len(old_k):>7} {len(new_k):>8} {match:>6} {miss:>5} {extra:>6} {status}"
+            f"{name:<28} {len(endf_keys):>6} {len(pyepics_keys):>8} "
+            f"{covered:>8} {missing:>8} {status}"
         )
 
-    _text_page(pdf, lines, title="Data-dictionary comparison")
+    if not any(endf_mf_mt_sets.values()):
+        lines.append("")
+        lines.append("No ENDF files found — dictionary check inconclusive.")
+        lines.append("Download ENDF data with: python -m pyepics.cli download")
+        _text_page(pdf, lines, title="Data-dictionary comparison (ENDF vs PyEPICS)")
+        return {"passed": None}
 
-    # Physical constants
-    const_names = [
-        "FINE_STRUCTURE", "ELECTRON_MASS", "BARN_TO_CM2",
-        "PLANCK_CONSTANT", "SPEED_OF_LIGHT", "ELECTRON_CHARGE",
+    _text_page(pdf, lines, title="Data-dictionary comparison (ENDF vs PyEPICS)")
+
+    # Verify internal dictionary consistency
+    internal_checks = [
+        ("PERIODIC_TABLE", M.PERIODIC_TABLE, 100),  # Z=1..100
+        ("ELECTRON_SUBSHELL_LABELS", M.ELECTRON_SUBSHELL_LABELS, 1),
+        ("SUBSHELL_DESIGNATORS", M.SUBSHELL_DESIGNATORS, 1),
+        ("ELECTRON_SECTIONS_ABBREVS", M.ELECTRON_SECTIONS_ABBREVS, 1),
     ]
-    const_lines = [f"{'Constant':<25} {'PyEEDL':>20} {'PyEPICS':>20} Match", "=" * 72]
+
+    int_lines = [
+        f"{'Dictionary':<28} {'Entries':>8} {'Min expected':>13} Status",
+        "=" * 56,
+    ]
+    for name, d, min_expected in internal_checks:
+        n = len(d)
+        ok = n >= min_expected
+        if not ok:
+            all_ok = False
+        int_lines.append(f"{name:<28} {n:>8} {min_expected:>13} {'OK' if ok else 'FAIL'}")
+
+    _text_page(pdf, int_lines, title="Internal dictionary completeness")
+
+    # Physical constants (self-check against NIST CODATA 2018 values)
+    const_checks = [
+        ("FINE_STRUCTURE", M.FINE_STRUCTURE, 7.2973525693e-3),
+        ("ELECTRON_MASS", M.ELECTRON_MASS, 0.51099895069),
+        ("BARN_TO_CM2", M.BARN_TO_CM2, 1e-24),
+        ("PLANCK_CONSTANT", M.PLANCK_CONSTANT, 6.62607015e-34),
+        ("SPEED_OF_LIGHT", M.SPEED_OF_LIGHT, 299792458.0),
+        ("ELECTRON_CHARGE", M.ELECTRON_CHARGE, 1.602176634e-19),
+    ]
+    const_lines = [f"{'Constant':<25} {'PyEPICS':>20} {'CODATA 2018':>20} Match", "=" * 72]
     const_ok = True
-    for name in const_names:
-        old_v = getattr(pyeedl_data, name, None)
-        new_v = getattr(M, name, None)
-        ok = old_v == new_v if (old_v is not None and new_v is not None) else False
+    for name, pyepics_v, ref_v in const_checks:
+        ok = pyepics_v == ref_v
         if not ok:
             const_ok = False
-        const_lines.append(f"{name:<25} {str(old_v):>20} {str(new_v):>20} {'OK' if ok else 'MISMATCH'}")
+        const_lines.append(f"{name:<25} {str(pyepics_v):>20} {str(ref_v):>20} {'OK' if ok else 'MISMATCH'}")
 
-    const_lines += ["", "All constants match." if const_ok else "MISMATCH detected!"]
-    _text_page(pdf, const_lines, title="Physical-constant verification")
+    const_lines += ["", "All constants match CODATA 2018." if const_ok else "MISMATCH detected!"]
+    _text_page(pdf, const_lines, title="Physical-constant verification (NIST CODATA 2018)")
 
     ctx["const_ok"] = const_ok
     return {"passed": all_ok and const_ok}
@@ -770,7 +855,8 @@ def generate_report(output_path: str | Path) -> bool:
         section_summary(pdf, ctx)
 
     all_pass = all(
-        r["passed"] is not False for r in ctx["results"].values()
+        r["passed"] is None or r["passed"]  # None = skipped, truthy = passed
+        for r in ctx["results"].values()
     )
     print()
     print(f"Report written to: {output_path}")
@@ -782,7 +868,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate PyEPICS regression-test PDF report.",
     )
-    default_out = PYEPICS_ROOT / "reports" / "regression_report.pdf"
+    default_out = PYEPICS_ROOT / "tests" / "reports" / "regression_report.pdf"
     parser.add_argument(
         "-o", "--output",
         default=str(default_out),

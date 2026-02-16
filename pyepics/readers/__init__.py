@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Copyright (c) 2026 Melek Derman
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
 
 """
@@ -20,8 +20,8 @@ All readers share the :class:`~pyepics.readers.base.BaseReader` interface.
 
 from __future__ import annotations
 
-from pyepics.readers.eedl import EEDLReader
 from pyepics.readers.eadl import EADLReader
+from pyepics.readers.eedl import EEDLReader
 from pyepics.readers.epdl import EPDLReader
 
 __all__ = ["EEDLReader", "EADLReader", "EPDLReader"]
