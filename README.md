@@ -312,13 +312,8 @@ PyEPICS uses the following authoritative data sources:
 | **Electron cross sections** | EEDL (Evaluated Electron Data Library) | [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) |
 | **Photon cross sections** | EPDL (Evaluated Photon Data Library) | [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) |
 | **Atomic relaxation** | EADL (Evaluated Atomic Data Library) | [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) |
-| **Binding energies** | EADL via ENDF-6 format (not NIST) | Parsed from EADL `.endf` files |
+| **Binding energies** | EADL (Evaluated Atomic Data Library) | [LLNL EPICS 2025](https://nuclear.llnl.gov/EPICS/) |
 | **Physical constants** | NIST CODATA 2018 | [NIST CODATA](https://physics.nist.gov/cuu/pdf/wallet_2018.pdf) |
-
-> **Note:** Binding energies are sourced from EADL (parsed from ENDF files), not from
-> the NIST X-Ray Transition Energies database. The reference validation data in
-> `tests/fixtures/reference_binding_energies.csv` is extracted from EEDL ENDF files
-> and compared against the PyEPICS-parsed values to ensure round-trip consistency.
 
 ## Acknowledgements
 
