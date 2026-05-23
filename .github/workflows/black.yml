@@ -1,4 +1,4 @@
-name: CI
+name: Black Check
 
 on:
   push:
