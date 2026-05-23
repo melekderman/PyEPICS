@@ -184,8 +184,16 @@ class EEDLReader(BaseReader):
 
             energy = np.asarray(sigma.x, dtype="f8")
             xs = np.asarray(sigma.y, dtype="f8")
-            bps = np.asarray(sigma.breakpoints, dtype="f8") if sigma.breakpoints is not None else None
-            interp = np.asarray(sigma.interpolation, dtype="f8") if sigma.interpolation is not None else None
+            bps = (
+                np.asarray(sigma.breakpoints, dtype="f8")
+                if sigma.breakpoints is not None
+                else None
+            )
+            interp = (
+                np.asarray(sigma.interpolation, dtype="f8")
+                if sigma.interpolation is not None
+                else None
+            )
 
             if validate:
                 validate_cross_section(energy, xs, label=abbrev)
@@ -317,12 +325,14 @@ class EEDLReader(BaseReader):
                     xs_key = f"xs_{shell_label}"
                     if xs_key in cross_sections:
                         # Attach binding energy as first y_tab energy point
-                        if hasattr(y_tab, 'x') and len(y_tab.x) > 0:
-                            cross_sections[xs_key].breakpoints = (
-                                cross_sections[xs_key].breakpoints
-                            )  # preserve existing
+                        if hasattr(y_tab, "x") and len(y_tab.x) > 0:
+                            cross_sections[xs_key].breakpoints = cross_sections[
+                                xs_key
+                            ].breakpoints  # preserve existing
 
-                logger.debug("  MF=26/MT=%d (%s): %d records", mt, abbrev, len(inc_e_arr2))
+                logger.debug(
+                    "  MF=26/MT=%d (%s): %d records", mt, abbrev, len(inc_e_arr2)
+                )
 
         dataset = EEDLDataset(
             Z=Z,

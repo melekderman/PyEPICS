@@ -48,6 +48,7 @@ ENDF_DIR = PYEPICS_ROOT / "data" / "endf"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _collect_endf_mf_mt(lib_name: str) -> set[tuple[int, int]]:
     """Return the set of (MF, MT) pairs present in ENDF files for *lib_name*.
 
@@ -72,6 +73,7 @@ def _collect_endf_mf_mt(lib_name: str) -> set[tuple[int, int]]:
 # ---------------------------------------------------------------------------
 # Parametrised completeness tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "lib_name, desc_dict, abbrev_dict",
@@ -125,6 +127,7 @@ class TestMappingCompleteness:
 # Internal-consistency tests  (always run, no ENDF files required)
 # ---------------------------------------------------------------------------
 
+
 class TestInternalConsistency:
     """Checks that mapping dicts are internally well-formed."""
 
@@ -143,14 +146,20 @@ class TestInternalConsistency:
     def test_no_duplicate_abbreviations_eedl(self):
         """No two EEDL sections share the same abbreviation."""
         vals = list(ELECTRON_SECTIONS_ABBREVS.values())
-        assert len(vals) == len(set(vals)), "Duplicate abbreviations in ELECTRON_SECTIONS_ABBREVS"
+        assert len(vals) == len(
+            set(vals)
+        ), "Duplicate abbreviations in ELECTRON_SECTIONS_ABBREVS"
 
     def test_no_duplicate_abbreviations_epdl(self):
         """No two EPDL sections share the same abbreviation."""
         vals = list(PHOTON_SECTIONS_ABBREVS.values())
-        assert len(vals) == len(set(vals)), "Duplicate abbreviations in PHOTON_SECTIONS_ABBREVS"
+        assert len(vals) == len(
+            set(vals)
+        ), "Duplicate abbreviations in PHOTON_SECTIONS_ABBREVS"
 
     def test_no_duplicate_abbreviations_eadl(self):
         """No two EADL sections share the same abbreviation."""
         vals = list(ATOMIC_SECTIONS_ABBREVS.values())
-        assert len(vals) == len(set(vals)), "Duplicate abbreviations in ATOMIC_SECTIONS_ABBREVS"
+        assert len(vals) == len(
+            set(vals)
+        ), "Duplicate abbreviations in ATOMIC_SECTIONS_ABBREVS"

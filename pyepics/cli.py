@@ -116,6 +116,7 @@ def _element_symbol(Z: int) -> str:
 # Commands
 # ---------------------------------------------------------------------------
 
+
 def cmd_download(args):
     """Download ENDF files from LLNL."""
     from pyepics.io.download import download_library
@@ -167,7 +168,11 @@ def cmd_raw(args):
                 continue
 
             out_path = raw_dir / f"{sym}.h5"
-            print(f"  Z={Z:3d} ({sym:>2s}): {endf_file.name} -> {out_path.name}", end=" ... ", flush=True)
+            print(
+                f"  Z={Z:3d} ({sym:>2s}): {endf_file.name} -> {out_path.name}",
+                end=" ... ",
+                flush=True,
+            )
 
             try:
                 create_raw_hdf5(
@@ -282,6 +287,7 @@ def cmd_all(args):
 # Argument parser
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -301,12 +307,14 @@ Examples:
 
     # Common arguments
     parser.add_argument(
-        "--data-dir", "-d",
+        "--data-dir",
+        "-d",
         default=".",
         help="Base data directory (default: current directory)",
     )
     parser.add_argument(
-        "--libraries", "-l",
+        "--libraries",
+        "-l",
         nargs="*",
         choices=["electron", "photon", "atomic"],
         default=None,
@@ -335,7 +343,8 @@ Examples:
         help="Continue processing after errors",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable debug logging",
     )
@@ -357,7 +366,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.verbose:
-        logging.basicConfig(level=logging.DEBUG, format="%(name)s %(levelname)s: %(message)s")
+        logging.basicConfig(
+            level=logging.DEBUG, format="%(name)s %(levelname)s: %(message)s"
+        )
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
 

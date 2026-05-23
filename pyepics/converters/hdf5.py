@@ -102,6 +102,7 @@ logger = logging.getLogger(__name__)
 # Internal writers
 # ---------------------------------------------------------------------------
 
+
 def _write_metadata(
     h5f: h5py.File,
     dataset: DatasetModel,
@@ -185,7 +186,9 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     def interp(key: str) -> np.ndarray:
         """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
-            return linear_interpolation(xs_energy_grid, xs[key].energy, xs[key].cross_section)
+            return linear_interpolation(
+                xs_energy_grid, xs[key].energy, xs[key].cross_section
+            )
         return np.zeros_like(xs_energy_grid)
 
     xs_sc_total = interp("xs_el")
@@ -224,7 +227,9 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     mask_sa = xs_sc_sa > 0.0
     if np.any(mask_sa):
         eg_sa, off_sa, val_sa, pdf_sa = small_angle_scattering_cosine(
-            Z, xs_energy_grid[mask_sa], n_mu=200,
+            Z,
+            xs_energy_grid[mask_sa],
+            n_mu=200,
         )
         sc_grp_sa = sa_grp.create_group("scattering_cosine")
         _create_xs_dataset(sc_grp_sa, "energy_grid", eg_sa, "eV")
@@ -263,7 +268,9 @@ def _write_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
             continue
 
         shell_xs = linear_interpolation(
-            xs_energy_grid, xs[xs_key].energy, xs[xs_key].cross_section,
+            xs_energy_grid,
+            xs[xs_key].energy,
+            xs[xs_key].cross_section,
         )
         sg = subs_grp.create_group(shell_label)
         _create_xs_dataset(sg, "xs", shell_xs, "barns")
@@ -308,7 +315,9 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     def interp(key: str) -> np.ndarray:
         """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
-            return linear_interpolation(xs_energy_grid, xs[key].energy, xs[key].cross_section)
+            return linear_interpolation(
+                xs_energy_grid, xs[key].energy, xs[key].cross_section
+            )
         return np.zeros_like(xs_energy_grid)
 
     _create_xs_dataset(root, "xs_energy_grid", xs_energy_grid, "eV")
@@ -322,7 +331,9 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     _create_xs_dataset(coh_grp, "xs", interp("xs_coherent"), "barns")
     if "ff_coherent" in ff:
         ff_grp = coh_grp.create_group("form_factor")
-        _create_xs_dataset(ff_grp, "momentum_transfer", ff["ff_coherent"].x, "1/angstrom")
+        _create_xs_dataset(
+            ff_grp, "momentum_transfer", ff["ff_coherent"].x, "1/angstrom"
+        )
         ff_grp.create_dataset("value", data=ff["ff_coherent"].y)
 
     # Incoherent scattering
@@ -330,7 +341,9 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     _create_xs_dataset(inc_grp, "xs", interp("xs_incoherent"), "barns")
     if "sf_incoherent" in ff:
         sf_grp = inc_grp.create_group("scattering_function")
-        _create_xs_dataset(sf_grp, "momentum_transfer", ff["sf_incoherent"].x, "1/angstrom")
+        _create_xs_dataset(
+            sf_grp, "momentum_transfer", ff["sf_incoherent"].x, "1/angstrom"
+        )
         sf_grp.create_dataset("value", data=ff["sf_incoherent"].y)
 
     # Photoelectric
@@ -342,7 +355,9 @@ def _write_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
         if key not in xs:
             continue
         sg = pe_subs.create_group(shell_label)
-        shell_xs = linear_interpolation(xs_energy_grid, xs[key].energy, xs[key].cross_section)
+        shell_xs = linear_interpolation(
+            xs_energy_grid, xs[key].energy, xs[key].cross_section
+        )
         _create_xs_dataset(sg, "xs", shell_xs, "barns")
 
     # Pair production
@@ -424,7 +439,9 @@ def _write_eadl(h5f: h5py.File, dataset: EADLDataset) -> None:
             )
             ag.create_dataset(
                 "secondary_designator",
-                data=np.array([t.secondary_designator for t in auger_trans], dtype="i4"),
+                data=np.array(
+                    [t.secondary_designator for t in auger_trans], dtype="i4"
+                ),
             )
             ds_e = ag.create_dataset(
                 "energy_eV",
@@ -532,9 +549,7 @@ def convert_dataset_to_hdf5(
     out = Path(output_path)
 
     if out.exists() and not overwrite:
-        raise ConversionError(
-            f"Output file {out} already exists and overwrite=False."
-        )
+        raise ConversionError(f"Output file {out} already exists and overwrite=False.")
 
     # Select reader
     from pyepics.readers.eadl import EADLReader
@@ -568,9 +583,7 @@ def convert_dataset_to_hdf5(
     except Exception as exc:
         if isinstance(exc, ConversionError):
             raise
-        raise ConversionError(
-            f"Failed to write HDF5 file {out}: {exc}"
-        ) from exc
+        raise ConversionError(f"Failed to write HDF5 file {out}: {exc}") from exc
 
     logger.info("Wrote %s HDF5 file: %s", dataset_type, out)
 
@@ -579,11 +592,13 @@ def convert_dataset_to_hdf5(
 # Two-step pipeline: raw + MCDC
 # ---------------------------------------------------------------------------
 
+
 def _get_reader(dataset_type: str):
     """Return the correct reader class for a dataset type."""
     from pyepics.readers.eadl import EADLReader
     from pyepics.readers.eedl import EEDLReader
     from pyepics.readers.epdl import EPDLReader
+
     return {"EEDL": EEDLReader, "EADL": EADLReader, "EPDL": EPDLReader}[dataset_type]
 
 
@@ -686,7 +701,11 @@ def create_mcdc_hdf5(
         write_mcdc_epdl,
     )
 
-    writers = {"EEDL": write_mcdc_eedl, "EPDL": write_mcdc_epdl, "EADL": write_mcdc_eadl}
+    writers = {
+        "EEDL": write_mcdc_eedl,
+        "EPDL": write_mcdc_epdl,
+        "EADL": write_mcdc_eadl,
+    }
     if dataset_type not in writers:
         raise ValueError(f"Unknown dataset_type: {dataset_type!r}")
 
@@ -763,9 +782,15 @@ def create_combined_mcdc_hdf5(
     if out.exists() and not overwrite:
         raise ConversionError(f"Output file {out} already exists and overwrite=False.")
 
-    eedl_ds = EEDLReader().read(Path(eedl_path), validate=validate) if eedl_path else None
-    epdl_ds = EPDLReader().read(Path(epdl_path), validate=validate) if epdl_path else None
-    eadl_ds = EADLReader().read(Path(eadl_path), validate=validate) if eadl_path else None
+    eedl_ds = (
+        EEDLReader().read(Path(eedl_path), validate=validate) if eedl_path else None
+    )
+    epdl_ds = (
+        EPDLReader().read(Path(epdl_path), validate=validate) if epdl_path else None
+    )
+    eadl_ds = (
+        EADLReader().read(Path(eadl_path), validate=validate) if eadl_path else None
+    )
 
     if not any([eedl_ds, epdl_ds, eadl_ds]):
         raise ConversionError(
@@ -781,7 +806,9 @@ def create_combined_mcdc_hdf5(
     except Exception as exc:
         if isinstance(exc, ConversionError):
             raise
-        raise ConversionError(f"Failed to write combined MCDC HDF5 {out}: {exc}") from exc
+        raise ConversionError(
+            f"Failed to write combined MCDC HDF5 {out}: {exc}"
+        ) from exc
 
     libs = []
     if eedl_ds:

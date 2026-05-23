@@ -73,9 +73,10 @@ class EPDLReader(BaseReader):
 
     Notes
     -----
-    All parsing is done via ``endf.Material``.  The ``sigma`` attribute
-    of each section's ``Tabulated1D`` object is read for both MF=23 and
-    MF=27 data.
+    All parsing is done via ``endf.Material``.  Tabulated data is read
+    from the ``sigma`` key for MF=23 sections and from the ``H`` key for
+    MF=27 sections (the ``endf`` package uses different field names for
+    cross sections and form factors / scattering functions).
 
     Examples
     --------
@@ -156,20 +157,24 @@ class EPDLReader(BaseReader):
                 continue
 
             sec = mat.section_data[(mf, mt)]
-            sigma = sec.get("sigma")
-            if sigma is None:
+            # ``endf`` exposes MF=23 tabulated cross sections under
+            # ``sigma`` and MF=27 form-factor / scattering-function
+            # tables under ``H``.
+            tab_key = "H" if mf == 27 else "sigma"
+            tab = sec.get(tab_key)
+            if tab is None:
                 continue
 
-            x_arr = np.asarray(sigma.x, dtype="f8")
-            y_arr = np.asarray(sigma.y, dtype="f8")
+            x_arr = np.asarray(tab.x, dtype="f8")
+            y_arr = np.asarray(tab.y, dtype="f8")
             bps = (
-                np.asarray(sigma.breakpoints, dtype="f8")
-                if sigma.breakpoints is not None
+                np.asarray(tab.breakpoints, dtype="f8")
+                if tab.breakpoints is not None
                 else None
             )
             interp = (
-                np.asarray(sigma.interpolation, dtype="f8")
-                if sigma.interpolation is not None
+                np.asarray(tab.interpolation, dtype="f8")
+                if tab.interpolation is not None
                 else None
             )
 

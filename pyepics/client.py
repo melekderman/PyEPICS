@@ -54,9 +54,7 @@ ElementID = int | str
 _SYMBOL_TO_Z: dict[str, int] = {
     v["symbol"].lower(): k for k, v in PERIODIC_TABLE.items()
 }
-_NAME_TO_Z: dict[str, int] = {
-    v["name"].lower(): k for k, v in PERIODIC_TABLE.items()
-}
+_NAME_TO_Z: dict[str, int] = {v["name"].lower(): k for k, v in PERIODIC_TABLE.items()}
 
 
 def _resolve_element(element: ElementID) -> tuple[int, str]:
@@ -106,9 +104,7 @@ def _resolve_element(element: ElementID) -> tuple[int, str]:
     )
 
 
-def _find_endf_file(
-    data_dir: Path, library: str, z: int
-) -> Path | None:
+def _find_endf_file(data_dir: Path, library: str, z: int) -> Path | None:
     """Locate an ENDF file for the given library and atomic number."""
     lib_upper = library.upper()
     subdir_map = {"EEDL": "eedl", "EPDL": "epdl", "EADL": "eadl"}
@@ -128,6 +124,7 @@ def _find_endf_file(
 # ---------------------------------------------------------------------------
 # Element result container
 # ---------------------------------------------------------------------------
+
 
 class ElementProperties:
     """Container for all properties of a single element.
@@ -184,8 +181,7 @@ class ElementProperties:
         if self.atomic is None:
             return {}
         return {
-            name: sub.binding_energy_eV
-            for name, sub in self.atomic.subshells.items()
+            name: sub.binding_energy_eV for name, sub in self.atomic.subshells.items()
         }
 
     @property
@@ -270,6 +266,7 @@ class ElementProperties:
 # ---------------------------------------------------------------------------
 # Main client
 # ---------------------------------------------------------------------------
+
 
 class EPICSClient:
     """High-level interface for querying EPICS element data.
@@ -497,9 +494,7 @@ class EPICSClient:
                 "Install it with: pip install pandas"
             ) from None
 
-        rows = self.compare(
-            elements, properties=properties, libraries=libraries
-        )
+        rows = self.compare(elements, properties=properties, libraries=libraries)
         return pd.DataFrame(rows)
 
     def binding_energy_table(

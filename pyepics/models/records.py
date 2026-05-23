@@ -44,6 +44,7 @@ import numpy as np
 # Atomic-level building blocks
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CrossSectionRecord:
     """A single cross-section table (energy vs. σ)
@@ -146,6 +147,7 @@ class FormFactorRecord:
 # Atomic relaxation building blocks
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SubshellTransition:
     """A single atomic-relaxation transition
@@ -207,6 +209,7 @@ class SubshellRelaxation:
 # ---------------------------------------------------------------------------
 # Top-level dataset models  (one per EPICS library)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class EEDLDataset:

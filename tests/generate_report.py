@@ -110,6 +110,7 @@ from types import SimpleNamespace
 # Utility: render a text page into the PDF
 # ---------------------------------------------------------------------------
 
+
 def _text_page(pdf, lines: list[str], *, title: str = "", fontsize: int = 9):
     """Render a page of monospaced text into *pdf*."""
     import matplotlib.pyplot as plt
@@ -138,11 +139,27 @@ def _section_title_page(pdf, title: str, subtitle: str = ""):
 
     fig, ax = plt.subplots(figsize=(11, 8.5))
     ax.axis("off")
-    ax.text(0.5, 0.55, title, transform=ax.transAxes, fontsize=24,
-            fontweight="bold", ha="center", va="center")
+    ax.text(
+        0.5,
+        0.55,
+        title,
+        transform=ax.transAxes,
+        fontsize=24,
+        fontweight="bold",
+        ha="center",
+        va="center",
+    )
     if subtitle:
-        ax.text(0.5, 0.42, subtitle, transform=ax.transAxes, fontsize=14,
-                ha="center", va="center", color="gray")
+        ax.text(
+            0.5,
+            0.42,
+            subtitle,
+            transform=ax.transAxes,
+            fontsize=14,
+            ha="center",
+            va="center",
+            color="gray",
+        )
     pdf.savefig(fig)
     plt.close(fig)
 
@@ -152,6 +169,7 @@ def _section_title_page(pdf, title: str, subtitle: str = ""):
 # with at minimum {"passed": bool}
 # ===================================================================
 
+
 def section_cover(pdf, ctx):
     """Title / cover page."""
     import matplotlib.pyplot as plt
@@ -159,12 +177,36 @@ def section_cover(pdf, ctx):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     fig, ax = plt.subplots(figsize=(11, 8.5))
     ax.axis("off")
-    ax.text(0.5, 0.65, "PyEPICS Regression Test Report", fontsize=28,
-            fontweight="bold", ha="center", va="center", transform=ax.transAxes)
-    ax.text(0.5, 0.50, f"Generated: {now}", fontsize=14,
-            ha="center", va="center", color="gray", transform=ax.transAxes)
-    ax.text(0.5, 0.42, f"PyEPICS root: {PYEPICS_ROOT}", fontsize=10,
-            ha="center", va="center", color="gray", transform=ax.transAxes)
+    ax.text(
+        0.5,
+        0.65,
+        "PyEPICS Regression Test Report",
+        fontsize=28,
+        fontweight="bold",
+        ha="center",
+        va="center",
+        transform=ax.transAxes,
+    )
+    ax.text(
+        0.5,
+        0.50,
+        f"Generated: {now}",
+        fontsize=14,
+        ha="center",
+        va="center",
+        color="gray",
+        transform=ax.transAxes,
+    )
+    ax.text(
+        0.5,
+        0.42,
+        f"PyEPICS root: {PYEPICS_ROOT}",
+        fontsize=10,
+        ha="center",
+        va="center",
+        color="gray",
+        transform=ax.transAxes,
+    )
     pdf.savefig(fig)
     plt.close(fig)
     return {"passed": True}
@@ -206,32 +248,41 @@ def section_eedl_plots(pdf, ctx):
     eedl_files = sorted(eedl_dir.glob("*EEDL*.endf")) if eedl_dir.exists() else []
 
     if not eedl_files:
-        _text_page(pdf, [
-            "No EEDL ENDF files found.",
-            f"Searched: {eedl_dir}",
-            "",
-            "Download from: https://nuclear.llnl.gov/EPICS/",
-        ], title="EEDL — skipped")
+        _text_page(
+            pdf,
+            [
+                "No EEDL ENDF files found.",
+                f"Searched: {eedl_dir}",
+                "",
+                "Download from: https://nuclear.llnl.gov/EPICS/",
+            ],
+            title="EEDL — skipped",
+        )
         return {"passed": None}  # skipped
 
     reader = M.EEDLReader()
     styles = {
-        "xs_tot":  {"color": "black",  "ls": "--", "lw": 2,   "label": "Total"},
-        "xs_el":   {"color": "blue",   "ls": "-",  "lw": 1.5, "label": "Elastic"},
-        "xs_lge":  {"color": "purple", "ls": ":",  "lw": 1,   "label": "Large Angle"},
-        "xs_brem": {"color": "red",    "ls": "-",  "lw": 1.5, "label": "Bremsstrahlung"},
-        "xs_exc":  {"color": "green",  "ls": "-",  "lw": 1.5, "label": "Excitation"},
-        "xs_ion":  {"color": "orange", "ls": "-",  "lw": 1.5, "label": "Ionization"},
+        "xs_tot": {"color": "black", "ls": "--", "lw": 2, "label": "Total"},
+        "xs_el": {"color": "blue", "ls": "-", "lw": 1.5, "label": "Elastic"},
+        "xs_lge": {"color": "purple", "ls": ":", "lw": 1, "label": "Large Angle"},
+        "xs_brem": {"color": "red", "ls": "-", "lw": 1.5, "label": "Bremsstrahlung"},
+        "xs_exc": {"color": "green", "ls": "-", "lw": 1.5, "label": "Excitation"},
+        "xs_ion": {"color": "orange", "ls": "-", "lw": 1.5, "label": "Ionization"},
     }
 
     for fpath in eedl_files[:5]:
         ds = reader.read(str(fpath))
         fig, ax = plt.subplots(figsize=(11, 7))
         for abbrev, xs in ds.cross_sections.items():
-            sty = dict(styles.get(abbrev, {"color": "gray", "ls": "-", "lw": 0.8, "label": abbrev}))
+            sty = dict(
+                styles.get(
+                    abbrev, {"color": "gray", "ls": "-", "lw": 0.8, "label": abbrev}
+                )
+            )
             if len(xs.energy) > 0:
-                ax.loglog(xs.energy, xs.cross_section,
-                          label=sty.pop("label", abbrev), **sty)
+                ax.loglog(
+                    xs.energy, xs.cross_section, label=sty.pop("label", abbrev), **sty
+                )
         ax.set_xlabel("Energy (eV)")
         ax.set_ylabel("Cross Section (barns)")
         ax.set_title(f"EEDL Electron Cross Sections — {ds.symbol} (Z={ds.Z})")
@@ -252,7 +303,11 @@ def section_epdl_plots(pdf, ctx):
     M = ctx["M"]
     _section_title_page(pdf, "3. EPDL Photon Cross-Section Plots")
 
-    epdl_files = sorted((PYEPICS_ROOT / "data" / "endf" / "epdl").glob("*EPDL*.endf")) if (PYEPICS_ROOT / "data" / "endf" / "epdl").exists() else []
+    epdl_files = (
+        sorted((PYEPICS_ROOT / "data" / "endf" / "epdl").glob("*EPDL*.endf"))
+        if (PYEPICS_ROOT / "data" / "endf" / "epdl").exists()
+        else []
+    )
     if not epdl_files:
         _text_page(pdf, ["No EPDL ENDF files found — skipped."], title="EPDL")
         return {"passed": None}
@@ -290,14 +345,19 @@ def section_binding_energy(pdf, ctx):
     import matplotlib.pyplot as plt
 
     M = ctx["M"]
-    _section_title_page(pdf, "4. Binding-Energy Validation",
-                        "EADL vs EEDL/ENDF reference (all subshells)")
+    _section_title_page(
+        pdf,
+        "4. Binding-Energy Validation",
+        "EADL vs EEDL/ENDF reference (all subshells)",
+    )
 
     mcdc_dir = PYEPICS_ROOT / "data" / "mcdc" / "electron"
     h5_files = sorted(mcdc_dir.glob("*.h5")) if mcdc_dir.exists() else []
 
     if not h5_files:
-        _text_page(pdf, ["No MC/DC HDF5 files found — skipped."], title="Binding energy")
+        _text_page(
+            pdf, ["No MC/DC HDF5 files found — skipped."], title="Binding energy"
+        )
         return {"passed": None}
 
     h5py = M.h5py
@@ -310,14 +370,24 @@ def section_binding_energy(pdf, ctx):
                 Z = int(f["atomic_number"][()])
                 sym = PERIODIC_TABLE.get(Z, {}).get("symbol", "?")
                 if "electron_reactions/ionization/subshells" in f:
-                    for shell, grp in f["electron_reactions/ionization/subshells"].items():
-                        be_rows.append({"Z": Z, "symbol": sym, "subshell": shell,
-                                        "be_eV": float(grp["binding_energy"][()])})
+                    for shell, grp in f[
+                        "electron_reactions/ionization/subshells"
+                    ].items():
+                        be_rows.append(
+                            {
+                                "Z": Z,
+                                "symbol": sym,
+                                "subshell": shell,
+                                "be_eV": float(grp["binding_energy"][()]),
+                            }
+                        )
         except Exception:
             pass
 
     if not be_rows:
-        _text_page(pdf, ["No subshell data found in HDF5 files."], title="Binding energy")
+        _text_page(
+            pdf, ["No subshell data found in HDF5 files."], title="Binding energy"
+        )
         return {"passed": None}
 
     df_be = pd.DataFrame(be_rows)
@@ -351,41 +421,70 @@ def section_binding_energy(pdf, ctx):
         if df_comp.empty:
             continue
 
-        df_comp["rel_error_pct"] = 100 * abs(
-            df_comp["be_eV"] - df_comp["binding_energy_eV"]
-        ) / df_comp["binding_energy_eV"]
+        df_comp["rel_error_pct"] = (
+            100
+            * abs(df_comp["be_eV"] - df_comp["binding_energy_eV"])
+            / df_comp["binding_energy_eV"]
+        )
 
         max_err = df_comp["rel_error_pct"].max()
         overall_max_err = max(overall_max_err, max_err)
-        subshell_summaries.append({
-            "subshell": shell,
-            "n_elements": len(df_comp),
-            "max_err_pct": max_err,
-            "passed": bool(max_err < 5.0),
-        })
+        subshell_summaries.append(
+            {
+                "subshell": shell,
+                "n_elements": len(df_comp),
+                "max_err_pct": max_err,
+                "passed": bool(max_err < 5.0),
+            }
+        )
 
     # Plot K-shell (primary visual — always present in reference)
     df_ref_k = df_ref[df_ref["subshell"] == "K"].copy()
     df_k = df_be[df_be["subshell"] == "K"].sort_values("Z").copy()
 
     if not df_k.empty and not df_ref_k.empty:
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8.5), sharex=True,
-                                        gridspec_kw={"height_ratios": [3, 1]})
-        ax1.semilogy(df_k["Z"], df_k["be_eV"], "o-", color="blue", ms=4,
-                     label="EADL (parsed)", alpha=0.8)
-        ax1.semilogy(df_ref_k["Z"], df_ref_k["binding_energy_eV"], "s", color="red",
-                     ms=8, label="EEDL/ENDF Reference", zorder=5)
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, figsize=(11, 8.5), sharex=True, gridspec_kw={"height_ratios": [3, 1]}
+        )
+        ax1.semilogy(
+            df_k["Z"],
+            df_k["be_eV"],
+            "o-",
+            color="blue",
+            ms=4,
+            label="EADL (parsed)",
+            alpha=0.8,
+        )
+        ax1.semilogy(
+            df_ref_k["Z"],
+            df_ref_k["binding_energy_eV"],
+            "s",
+            color="red",
+            ms=8,
+            label="EEDL/ENDF Reference",
+            zorder=5,
+        )
         ax1.set_ylabel("K-Shell Binding Energy (eV)")
         ax1.set_title("K-Shell Binding Energy: EADL vs EEDL/ENDF Reference")
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
-        df_comp_k = pd.merge(df_k[["Z", "be_eV"]], df_ref_k[["Z", "binding_energy_eV"]], on="Z")
-        df_comp_k["rel_error_pct"] = 100 * abs(
-            df_comp_k["be_eV"] - df_comp_k["binding_energy_eV"]
-        ) / df_comp_k["binding_energy_eV"]
+        df_comp_k = pd.merge(
+            df_k[["Z", "be_eV"]], df_ref_k[["Z", "binding_energy_eV"]], on="Z"
+        )
+        df_comp_k["rel_error_pct"] = (
+            100
+            * abs(df_comp_k["be_eV"] - df_comp_k["binding_energy_eV"])
+            / df_comp_k["binding_energy_eV"]
+        )
 
-        ax2.bar(df_comp_k["Z"], df_comp_k["rel_error_pct"], color="orange", alpha=0.7, width=1.0)
+        ax2.bar(
+            df_comp_k["Z"],
+            df_comp_k["rel_error_pct"],
+            color="orange",
+            alpha=0.7,
+            width=1.0,
+        )
         ax2.axhline(5.0, color="red", ls="--", label="5% threshold")
         ax2.set_ylabel("Relative Error (%)")
         ax2.set_xlabel("Atomic Number (Z)")
@@ -427,8 +526,7 @@ def section_transition_energies(pdf, ctx):
     """Plot K->L2, K->L3 transition energies and L2-L3 splitting."""
     import matplotlib.pyplot as plt
 
-    _section_title_page(pdf, "5. Transition Energies",
-                        "K -> L2/L3 and L2-L3 splitting")
+    _section_title_page(pdf, "5. Transition Energies", "K -> L2/L3 and L2-L3 splitting")
 
     df_be = ctx.get("df_be")
     if df_be is None or df_be.empty:
@@ -452,10 +550,23 @@ def section_transition_energies(pdf, ctx):
     trans_kl3.columns = ["Z", "transition_eV"]
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8.5), sharex=True)
-    ax1.loglog(trans_kl2["Z"], trans_kl2["transition_eV"], "o-", color="blue",
-               ms=4, label="K -> L2")
-    ax1.loglog(trans_kl3["Z"], trans_kl3["transition_eV"], "s-", color="red",
-               ms=4, label="K -> L3", alpha=0.7)
+    ax1.loglog(
+        trans_kl2["Z"],
+        trans_kl2["transition_eV"],
+        "o-",
+        color="blue",
+        ms=4,
+        label="K -> L2",
+    )
+    ax1.loglog(
+        trans_kl3["Z"],
+        trans_kl3["transition_eV"],
+        "s-",
+        color="red",
+        ms=4,
+        label="K -> L3",
+        alpha=0.7,
+    )
     ax1.set_ylabel("Transition Energy (eV)")
     ax1.set_title("Atomic Subshell Transition Energies from EADL")
     ax1.legend()
@@ -464,8 +575,14 @@ def section_transition_energies(pdf, ctx):
 
     splitting = (df_l2_z.loc[common_kl3] - df_l3_z.loc[common_kl3]).reset_index()
     splitting.columns = ["Z", "splitting_eV"]
-    ax2.semilogy(splitting["Z"], splitting["splitting_eV"], "^-", color="green",
-                 ms=4, label="L2 - L3 splitting")
+    ax2.semilogy(
+        splitting["Z"],
+        splitting["splitting_eV"],
+        "^-",
+        color="green",
+        ms=4,
+        label="L2 - L3 splitting",
+    )
     ax2.set_xlabel("Atomic Number (Z)")
     ax2.set_ylabel("L2-L3 Splitting (eV)")
     ax2.legend()
@@ -496,22 +613,22 @@ def section_h5_cross_sections(pdf, ctx):
     PERIODIC_TABLE = M.PERIODIC_TABLE
 
     styles = {
-        "Total":          {"color": "black",  "ls": "--", "lw": 2},
-        "Elastic":        {"color": "blue",   "ls": "-",  "lw": 1.5},
-        "Large Angle":    {"color": "purple", "ls": ":",  "lw": 1.2},
-        "Small Angle":    {"color": "cyan",   "ls": ":",  "lw": 1.2},
-        "Bremsstrahlung": {"color": "red",    "ls": "-",  "lw": 1.5},
-        "Excitation":     {"color": "green",  "ls": "-",  "lw": 1.5},
-        "Ionization":     {"color": "orange", "ls": "-",  "lw": 1.5},
+        "Total": {"color": "black", "ls": "--", "lw": 2},
+        "Elastic": {"color": "blue", "ls": "-", "lw": 1.5},
+        "Large Angle": {"color": "purple", "ls": ":", "lw": 1.2},
+        "Small Angle": {"color": "cyan", "ls": ":", "lw": 1.2},
+        "Bremsstrahlung": {"color": "red", "ls": "-", "lw": 1.5},
+        "Excitation": {"color": "green", "ls": "-", "lw": 1.5},
+        "Ionization": {"color": "orange", "ls": "-", "lw": 1.5},
     }
     reaction_paths = [
-        ("Total",          "electron_reactions/total/xs"),
-        ("Elastic",        "electron_reactions/elastic_scattering/xs"),
-        ("Large Angle",    "electron_reactions/elastic_scattering/large_angle/xs"),
-        ("Small Angle",    "electron_reactions/elastic_scattering/small_angle/xs"),
+        ("Total", "electron_reactions/total/xs"),
+        ("Elastic", "electron_reactions/elastic_scattering/xs"),
+        ("Large Angle", "electron_reactions/elastic_scattering/large_angle/xs"),
+        ("Small Angle", "electron_reactions/elastic_scattering/small_angle/xs"),
         ("Bremsstrahlung", "electron_reactions/bremsstrahlung/xs"),
-        ("Excitation",     "electron_reactions/excitation/xs"),
-        ("Ionization",     "electron_reactions/ionization/xs"),
+        ("Excitation", "electron_reactions/excitation/xs"),
+        ("Ionization", "electron_reactions/ionization/xs"),
     ]
 
     plotted = 0
@@ -525,8 +642,12 @@ def section_h5_cross_sections(pdf, ctx):
             fig, ax = plt.subplots(figsize=(11, 7))
             for name, path in reaction_paths:
                 if path in f:
-                    ax.loglog(e_grid, f[path][()], label=name,
-                              **styles.get(name, {"color": "gray", "ls": "-", "lw": 1}))
+                    ax.loglog(
+                        e_grid,
+                        f[path][()],
+                        label=name,
+                        **styles.get(name, {"color": "gray", "ls": "-", "lw": 1}),
+                    )
             ax.set_xlabel("Energy (eV)")
             ax.set_ylabel("Cross Section (barns)")
             ax.set_title(f"MC/DC Electron Cross Sections — {elem} (Z={Z})")
@@ -555,7 +676,7 @@ def section_hdf5_roundtrip(pdf, ctx):
     energy = np.logspace(1, 7, 200)
     xs_total = 1e6 * energy ** (-0.8)
     xs_elastic = 0.9e6 * energy ** (-0.8)
-    xs_brem = 0.01 * energy ** 0.2
+    xs_brem = 0.01 * energy**0.2
 
     test_ds = M.EEDLDataset(
         Z=26,
@@ -563,9 +684,15 @@ def section_hdf5_roundtrip(pdf, ctx):
         atomic_weight_ratio=55.345,
         ZA=26000.0,
         cross_sections={
-            "xs_tot": M.CrossSectionRecord(label="xs_tot", energy=energy, cross_section=xs_total),
-            "xs_el": M.CrossSectionRecord(label="xs_el", energy=energy, cross_section=xs_elastic),
-            "xs_brem": M.CrossSectionRecord(label="xs_brem", energy=energy, cross_section=xs_brem),
+            "xs_tot": M.CrossSectionRecord(
+                label="xs_tot", energy=energy, cross_section=xs_total
+            ),
+            "xs_el": M.CrossSectionRecord(
+                label="xs_el", energy=energy, cross_section=xs_elastic
+            ),
+            "xs_brem": M.CrossSectionRecord(
+                label="xs_brem", energy=energy, cross_section=xs_brem
+            ),
         },
         distributions={},
         average_energy_losses={},
@@ -586,7 +713,9 @@ def section_hdf5_roundtrip(pdf, ctx):
         checks.append(("symbol == Fe", f["metadata/symbol"].asstr()[()] == "Fe"))
         checks.append(("EEDL/ group exists", "EEDL" in f))
         checks.append((f"{z_grp}/total exists", f"{z_grp}/total" in f))
-        checks.append((f"{z_grp}/elastic_scattering exists", f"{z_grp}/elastic_scattering" in f))
+        checks.append(
+            (f"{z_grp}/elastic_scattering exists", f"{z_grp}/elastic_scattering" in f)
+        )
         eg = f[f"{z_grp}/xs_energy_grid"][:]
         rt_xs = f[f"{z_grp}/total/xs"][:]
         checks.append(("energy grid shape", eg.shape == energy.shape))
@@ -618,8 +747,9 @@ def section_data_dictionaries(pdf, ctx):
     found in the actual ENDF source files.
     """
     M = ctx["M"]
-    _section_title_page(pdf, "8. Data-Dictionary Completeness",
-                        "ENDF source files vs PyEPICS mappings")
+    _section_title_page(
+        pdf, "8. Data-Dictionary Completeness", "ENDF source files vs PyEPICS mappings"
+    )
 
     # Discover (MF, MT) pairs present in actual ENDF files
     endf_dir = PYEPICS_ROOT / "data" / "endf"
@@ -632,6 +762,7 @@ def section_data_dictionaries(pdf, ctx):
         for fpath in sorted(lib_dir.glob("*.endf")):  # scan all files
             try:
                 import endf
+
                 tape = endf.Material(fpath)
                 # section_data keys are already (MF, MT) tuples
                 for mf_mt in tape.section_data:
@@ -689,7 +820,9 @@ def section_data_dictionaries(pdf, ctx):
         ok = n >= min_expected
         if not ok:
             all_ok = False
-        int_lines.append(f"{name:<28} {n:>8} {min_expected:>13} {'OK' if ok else 'FAIL'}")
+        int_lines.append(
+            f"{name:<28} {n:>8} {min_expected:>13} {'OK' if ok else 'FAIL'}"
+        )
 
     _text_page(pdf, int_lines, title="Internal dictionary completeness")
 
@@ -702,16 +835,26 @@ def section_data_dictionaries(pdf, ctx):
         ("SPEED_OF_LIGHT", M.SPEED_OF_LIGHT, 299792458.0),
         ("ELECTRON_CHARGE", M.ELECTRON_CHARGE, 1.602176634e-19),
     ]
-    const_lines = [f"{'Constant':<25} {'PyEPICS':>20} {'CODATA 2018':>20} Match", "=" * 72]
+    const_lines = [
+        f"{'Constant':<25} {'PyEPICS':>20} {'CODATA 2018':>20} Match",
+        "=" * 72,
+    ]
     const_ok = True
     for name, pyepics_v, ref_v in const_checks:
         ok = pyepics_v == ref_v
         if not ok:
             const_ok = False
-        const_lines.append(f"{name:<25} {str(pyepics_v):>20} {str(ref_v):>20} {'OK' if ok else 'MISMATCH'}")
+        const_lines.append(
+            f"{name:<25} {str(pyepics_v):>20} {str(ref_v):>20} {'OK' if ok else 'MISMATCH'}"
+        )
 
-    const_lines += ["", "All constants match CODATA 2018." if const_ok else "MISMATCH detected!"]
-    _text_page(pdf, const_lines, title="Physical-constant verification (NIST CODATA 2018)")
+    const_lines += [
+        "",
+        "All constants match CODATA 2018." if const_ok else "MISMATCH detected!",
+    ]
+    _text_page(
+        pdf, const_lines, title="Physical-constant verification (NIST CODATA 2018)"
+    )
 
     ctx["const_ok"] = const_ok
     return {"passed": all_ok and const_ok}
@@ -730,15 +873,33 @@ def section_docstring_audit(pdf, ctx):
             tree = ast.parse(fpath.read_text())
         except SyntaxError:
             continue
-        rows.append({"file": str(rel), "type": "module", "name": str(rel),
-                      "has_docstring": ast.get_docstring(tree) is not None})
+        rows.append(
+            {
+                "file": str(rel),
+                "type": "module",
+                "name": str(rel),
+                "has_docstring": ast.get_docstring(tree) is not None,
+            }
+        )
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                rows.append({"file": str(rel), "type": "function", "name": node.name,
-                              "has_docstring": ast.get_docstring(node) is not None})
+                rows.append(
+                    {
+                        "file": str(rel),
+                        "type": "function",
+                        "name": node.name,
+                        "has_docstring": ast.get_docstring(node) is not None,
+                    }
+                )
             elif isinstance(node, ast.ClassDef):
-                rows.append({"file": str(rel), "type": "class", "name": node.name,
-                              "has_docstring": ast.get_docstring(node) is not None})
+                rows.append(
+                    {
+                        "file": str(rel),
+                        "type": "class",
+                        "name": node.name,
+                        "has_docstring": ast.get_docstring(node) is not None,
+                    }
+                )
 
     total = len(rows)
     with_doc = sum(1 for r in rows if r["has_docstring"])
@@ -807,6 +968,7 @@ def section_summary(pdf, ctx):
 # Main
 # ===================================================================
 
+
 def generate_report(output_path: str | Path) -> bool:
     """Run all analyses and write the PDF report.
 
@@ -840,11 +1002,15 @@ def generate_report(output_path: str | Path) -> bool:
                 res = func(pdf, ctx)
             except Exception as exc:
                 res = {"passed": False, "error": str(exc)}
-                _text_page(pdf, [
-                    f"ERROR in section: {name}",
-                    "",
-                    str(exc),
-                ], title=f"Error — {name}")
+                _text_page(
+                    pdf,
+                    [
+                        f"ERROR in section: {name}",
+                        "",
+                        str(exc),
+                    ],
+                    title=f"Error — {name}",
+                )
                 print(f"ERROR: {exc}")
             else:
                 p = res.get("passed")
@@ -870,7 +1036,8 @@ def main():
     )
     default_out = PYEPICS_ROOT / "tests" / "reports" / "regression_report.pdf"
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         default=str(default_out),
         help=f"Output PDF path (default: {default_out})",
     )

@@ -70,6 +70,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _create_xs_dataset(
     group: h5py.Group,
     name: str,
@@ -88,7 +89,9 @@ def _write_mcdc_metadata(h5f: h5py.File, dataset) -> None:
     Safe to call multiple times — skips datasets that already exist.
     """
     if "atomic_number" not in h5f:
-        h5f.create_dataset("atomic_weight_ratio", data=np.float64(dataset.atomic_weight_ratio))
+        h5f.create_dataset(
+            "atomic_weight_ratio", data=np.float64(dataset.atomic_weight_ratio)
+        )
         h5f.create_dataset("atomic_number", data=np.int64(dataset.Z))
         h5f.create_dataset("element_name", data=dataset.symbol)
 
@@ -96,6 +99,7 @@ def _write_mcdc_metadata(h5f: h5py.File, dataset) -> None:
 # ---------------------------------------------------------------------------
 # EEDL MCDC writer
 # ---------------------------------------------------------------------------
+
 
 def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     """Write an MCDC-format EEDL HDF5 file
@@ -132,7 +136,9 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
         """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(
-                xs_energy_grid, xs[key].energy, xs[key].cross_section,
+                xs_energy_grid,
+                xs[key].energy,
+                xs[key].cross_section,
             )
         return np.zeros_like(xs_energy_grid)
 
@@ -172,7 +178,9 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     mask_sa = xs_sc_sa > 0.0
     if np.any(mask_sa):
         eg_sa, off_sa, val_sa, pdf_sa = small_angle_scattering_cosine(
-            Z, xs_energy_grid[mask_sa], n_mu=200,
+            Z,
+            xs_energy_grid[mask_sa],
+            n_mu=200,
         )
         sc_grp_sa = sa_grp.create_group("scattering_cosine")
         _create_xs_dataset(sc_grp_sa, "energy_grid", eg_sa, "eV")
@@ -210,7 +218,9 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
             continue
 
         shell_xs = linear_interpolation(
-            xs_energy_grid, xs[xs_key].energy, xs[xs_key].cross_section,
+            xs_energy_grid,
+            xs[xs_key].energy,
+            xs[xs_key].cross_section,
         )
         sg = subs_grp.create_group(shell_label)
         _create_xs_dataset(sg, "xs", shell_xs, "barns")
@@ -236,6 +246,7 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
 # ---------------------------------------------------------------------------
 # EPDL MCDC writer
 # ---------------------------------------------------------------------------
+
 
 def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     """Write an MCDC-format EPDL HDF5 file
@@ -266,7 +277,9 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
         """Interpolate cross-section *key* onto the common energy grid."""
         if key in xs:
             return linear_interpolation(
-                xs_energy_grid, xs[key].energy, xs[key].cross_section,
+                xs_energy_grid,
+                xs[key].energy,
+                xs[key].cross_section,
             )
         return np.zeros_like(xs_energy_grid)
 
@@ -289,7 +302,9 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     _create_xs_dataset(inc_grp, "xs", interp("xs_incoherent"), "barns")
     if "sf_incoherent" in ff:
         sfg = inc_grp.create_group("scattering_function")
-        _create_xs_dataset(sfg, "momentum_transfer", ff["sf_incoherent"].x, "1/angstrom")
+        _create_xs_dataset(
+            sfg, "momentum_transfer", ff["sf_incoherent"].x, "1/angstrom"
+        )
         sfg.create_dataset("value", data=ff["sf_incoherent"].y)
 
     # Photoelectric
@@ -302,7 +317,9 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
             continue
         sg = pe_subs.create_group(shell_label)
         shell_xs = linear_interpolation(
-            xs_energy_grid, xs[key].energy, xs[key].cross_section,
+            xs_energy_grid,
+            xs[key].energy,
+            xs[key].cross_section,
         )
         _create_xs_dataset(sg, "xs", shell_xs, "barns")
 
@@ -320,6 +337,7 @@ def write_mcdc_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
 # ---------------------------------------------------------------------------
 # EADL MCDC writer
 # ---------------------------------------------------------------------------
+
 
 def write_mcdc_eadl(h5f: h5py.File, dataset: EADLDataset) -> None:
     """Write an MCDC-format EADL HDF5 file
@@ -384,7 +402,9 @@ def write_mcdc_eadl(h5f: h5py.File, dataset: EADLDataset) -> None:
             )
             ag.create_dataset(
                 "secondary_designator",
-                data=np.array([t.secondary_designator for t in auger_trans], dtype="i4"),
+                data=np.array(
+                    [t.secondary_designator for t in auger_trans], dtype="i4"
+                ),
             )
             ds_e = ag.create_dataset(
                 "energy_eV",
@@ -409,12 +429,15 @@ def write_mcdc_eadl(h5f: h5py.File, dataset: EADLDataset) -> None:
             data=np.array(n_electrons_arr, dtype="f8"),
         )
 
-    logger.debug("Wrote MCDC EADL for Z=%d (%d subshells)", dataset.Z, dataset.n_subshells)
+    logger.debug(
+        "Wrote MCDC EADL for Z=%d (%d subshells)", dataset.Z, dataset.n_subshells
+    )
 
 
 # ---------------------------------------------------------------------------
 # Combined (all-in-one) MCDC writer
 # ---------------------------------------------------------------------------
+
 
 def write_mcdc_combined(
     h5f: h5py.File,

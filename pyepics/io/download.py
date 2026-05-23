@@ -63,6 +63,7 @@ LIBRARY_URLS: dict[str, dict[str, str]] = {
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def download_library(
     library_name: Literal["eedl", "epdl", "eadl"],
     out_dir: Path | str | None = None,
@@ -119,7 +120,9 @@ def download_library(
 
     logger.info(
         "Downloading %s (%s) from %s",
-        config["description"], prefix, base_url,
+        config["description"],
+        prefix,
+        base_url,
     )
     print(f"\n{'=' * 60}")
     print(f"  Downloading {config['description']} ({prefix})")

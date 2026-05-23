@@ -26,10 +26,10 @@ from pyepics.converters.hdf5 import convert_dataset_to_hdf5
 from pyepics.exceptions import ConversionError
 from pyepics.models.records import EADLDataset, EEDLDataset, EPDLDataset
 
-
 # -----------------------------------------------------------------------
 # Direct writer tests (using dataset fixtures)
 # -----------------------------------------------------------------------
+
 
 class TestWriteEEDL:
     """Test EEDL HDF5 output from a synthetic dataset"""
@@ -57,7 +57,9 @@ class TestWriteEEDL:
             assert int(h5f["metadata/Z"][()]) == 1
             assert h5f["metadata/symbol"].asstr()[()] == "H"
 
-    def test_eedl_groups_exist(self, tmp_path, sample_eedl_dataset: EEDLDataset) -> None:
+    def test_eedl_groups_exist(
+        self, tmp_path, sample_eedl_dataset: EEDLDataset
+    ) -> None:
         from pyepics.converters.hdf5 import _write_eedl, _write_metadata
 
         out = tmp_path / "test_eedl.h5"
@@ -73,7 +75,9 @@ class TestWriteEEDL:
             assert "EEDL/Z_001/excitation" in h5f
             assert "EEDL/Z_001/ionization" in h5f
 
-    def test_energy_grid_shape(self, tmp_path, sample_eedl_dataset: EEDLDataset) -> None:
+    def test_energy_grid_shape(
+        self, tmp_path, sample_eedl_dataset: EEDLDataset
+    ) -> None:
         from pyepics.converters.hdf5 import _write_eedl, _write_metadata
 
         out = tmp_path / "test_eedl.h5"
@@ -156,7 +160,9 @@ class TestWriteEADL:
 
         assert out.exists()
 
-    def test_subshell_structure(self, tmp_path, sample_eadl_dataset: EADLDataset) -> None:
+    def test_subshell_structure(
+        self, tmp_path, sample_eadl_dataset: EADLDataset
+    ) -> None:
         from pyepics.converters.hdf5 import _write_eadl, _write_metadata
 
         out = tmp_path / "test_eadl.h5"
@@ -168,7 +174,9 @@ class TestWriteEADL:
             assert "EADL/Z_026/subshells/K" in h5f
             assert "EADL/Z_026/subshells/L1" in h5f
 
-    def test_binding_energy_value(self, tmp_path, sample_eadl_dataset: EADLDataset) -> None:
+    def test_binding_energy_value(
+        self, tmp_path, sample_eadl_dataset: EADLDataset
+    ) -> None:
         from pyepics.converters.hdf5 import _write_eadl, _write_metadata
 
         out = tmp_path / "test_eadl.h5"
@@ -180,7 +188,9 @@ class TestWriteEADL:
             be = float(h5f["EADL/Z_026/subshells/K/binding_energy_eV"][()])
             assert be == pytest.approx(7112.0)
 
-    def test_radiative_transitions(self, tmp_path, sample_eadl_dataset: EADLDataset) -> None:
+    def test_radiative_transitions(
+        self, tmp_path, sample_eadl_dataset: EADLDataset
+    ) -> None:
         from pyepics.converters.hdf5 import _write_eadl, _write_metadata
 
         out = tmp_path / "test_eadl.h5"
@@ -211,6 +221,7 @@ class TestWriteEADL:
 # -----------------------------------------------------------------------
 # Error conditions
 # -----------------------------------------------------------------------
+
 
 class TestConvertErrors:
     """Tests for error handling in convert_dataset_to_hdf5"""

@@ -37,10 +37,10 @@ from pyepics.utils.validation import (
     validate_probability_sum,
 )
 
-
 # -----------------------------------------------------------------------
 # float_endf / int_endf
 # -----------------------------------------------------------------------
+
 
 class TestFloatEndf:
     """Tests for ENDF float conversion"""
@@ -94,6 +94,7 @@ class TestIntEndf:
 # parse_mf26_mt525
 # -----------------------------------------------------------------------
 
+
 class TestParseMf26Mt525:
     """Tests for the MF=26/MT=525 manual parser"""
 
@@ -103,26 +104,26 @@ class TestParseMf26Mt525:
         header = "\n".join([f"{'':66s}{'9999':>4s}{'26':>2s}{'525':>3s}{'0':>5s}"] * 8)
         # CONT: E_loss=0.0, E_in=1e4, fields 3-4 blank, NW=4, NL=2
         cont = (
-            " 0.00000+00"   # field 1: E_loss
-            " 1.00000+04"   # field 2: E_in
-            "           "   # field 3: blank
-            "           "   # field 4: blank
-            "          4"   # field 5: NW
-            "          2"   # field 6: NL
+            " 0.00000+00"  # field 1: E_loss
+            " 1.00000+04"  # field 2: E_in
+            "           "  # field 3: blank
+            "           "  # field 4: blank
+            "          4"  # field 5: NW
+            "          2"  # field 6: NL
             "9999 26 525    1"
         )
         # Data line: mu1, p1, mu2, p2
         data = (
-            "-1.0000+00"    # mu1 = -1.0  (10 chars, pad to 11)
+            "-1.0000+00"  # mu1 = -1.0  (10 chars, pad to 11)
             " "
-            " 5.0000-01"    # p1  = 0.5
+            " 5.0000-01"  # p1  = 0.5
             " "
-            " 1.0000+00"    # mu2 = 1.0
+            " 1.0000+00"  # mu2 = 1.0
             " "
-            " 5.0000-01"    # p2 = 0.5
+            " 5.0000-01"  # p2 = 0.5
             " "
-            "           "   # field 5 (pad)
-            "           "   # field 6 (pad)
+            "           "  # field 5 (pad)
+            "           "  # field 6 (pad)
         )
         return header + "\n" + cont + "\n" + data
 
@@ -147,6 +148,7 @@ class TestParseMf26Mt525:
 # build_pdf
 # -----------------------------------------------------------------------
 
+
 class TestBuildPdf:
     """Tests for the flat-to-grouped PDF builder"""
 
@@ -166,7 +168,9 @@ class TestBuildPdf:
 
     def test_empty_input(self) -> None:
         eg, eo, v, p = build_pdf(
-            np.array([]), np.array([]), np.array([]),
+            np.array([]),
+            np.array([]),
+            np.array([]),
         )
         assert eg.size == 0
         assert eo.shape == (0,)
@@ -175,6 +179,7 @@ class TestBuildPdf:
 # -----------------------------------------------------------------------
 # linear_interpolation
 # -----------------------------------------------------------------------
+
 
 class TestLinearInterpolation:
     """Tests for the interpolation wrapper"""
@@ -197,6 +202,7 @@ class TestLinearInterpolation:
 # -----------------------------------------------------------------------
 # small_angle_eta / small_angle_scattering_cosine
 # -----------------------------------------------------------------------
+
 
 class TestSmallAngle:
     """Tests for Rutherford screening parameter and cosine distributions"""
@@ -225,6 +231,7 @@ class TestSmallAngle:
 # extract_atomic_number_from_path
 # -----------------------------------------------------------------------
 
+
 class TestExtractAtomicNumber:
     """Tests for filename pattern matching"""
 
@@ -248,6 +255,7 @@ class TestExtractAtomicNumber:
 # -----------------------------------------------------------------------
 # Validation
 # -----------------------------------------------------------------------
+
 
 class TestValidation:
     """Tests for post-parse validation routines"""
@@ -296,6 +304,7 @@ class TestValidation:
 # -----------------------------------------------------------------------
 # EEDLReader (with synthetic data)
 # -----------------------------------------------------------------------
+
 
 class TestEEDLReader:
     """Tests for EEDL reader (file-not-found path)"""

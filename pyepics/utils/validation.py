@@ -58,6 +58,7 @@ PROBABILITY_TOLERANCE: float = 0.05
 # Validation functions
 # ---------------------------------------------------------------------------
 
+
 def validate_atomic_number(Z: int) -> None:
     """Verify that *Z* is a valid atomic number
 
@@ -236,5 +237,7 @@ def validate_probability_sum(
         )
     logger.debug(
         "Probability sum for '%s' = %.6f passed (tol=%.2f).",
-        label, total, PROBABILITY_TOLERANCE,
+        label,
+        total,
+        PROBABILITY_TOLERANCE,
     )
