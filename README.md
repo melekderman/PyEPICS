@@ -1,6 +1,6 @@
 # PyEPICS
 
-<a href="https://doi.org/10.5281/zenodo.18648203"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.18648203.svg" alt="DOI"></a>
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18648203.svg)](https://doi.org/10.5281/zenodo.18648203)
 [![CI](https://github.com/melekderman/PyEPICS/actions/workflows/test.yml/badge.svg)](https://github.com/melekderman/PyEPICS/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
