@@ -14,7 +14,6 @@ attribute values, and error conditions for all three dataset types.
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 try:

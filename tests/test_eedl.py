@@ -17,23 +17,22 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pyepics.exceptions import ParseError, ValidationError, FileFormatError
-from pyepics.models.records import EEDLDataset, CrossSectionRecord
+from pyepics.exceptions import FileFormatError, ParseError, ValidationError
 from pyepics.utils.parsing import (
+    build_pdf,
+    extract_atomic_number_from_path,
     float_endf,
     int_endf,
-    parse_mf26_mt525,
-    build_pdf,
     linear_interpolation,
+    parse_mf26_mt525,
     small_angle_eta,
     small_angle_scattering_cosine,
-    extract_atomic_number_from_path,
 )
 from pyepics.utils.validation import (
     validate_atomic_number,
+    validate_cross_section,
     validate_energy_monotonic,
     validate_non_negative,
-    validate_cross_section,
     validate_probability_sum,
 )
 

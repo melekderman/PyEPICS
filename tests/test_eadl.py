@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 
 from pyepics.exceptions import FileFormatError
-from pyepics.models.records import EADLDataset, SubshellRelaxation
+from pyepics.models.records import EADLDataset
 
 
 class TestEADLDataset:

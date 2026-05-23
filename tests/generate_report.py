@@ -32,13 +32,10 @@ from __future__ import annotations
 import argparse
 import ast
 import datetime
-import glob
-import io
 import os
 import subprocess
 import sys
 import tempfile
-import textwrap
 from pathlib import Path
 
 import numpy as np
@@ -60,46 +57,6 @@ def _lazy_imports():
     import matplotlib
 
     matplotlib.use("Agg")  # non-interactive backend
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_pdf import PdfPages
-
-    import h5py
-
-    from pyepics.readers.eedl import EEDLReader
-    from pyepics.readers.epdl import EPDLReader
-    from pyepics.readers.eadl import EADLReader
-    from pyepics.converters.hdf5 import (
-        convert_dataset_to_hdf5,
-        _write_eedl,
-        _write_metadata,
-    )
-    from pyepics.models.records import (
-        AverageEnergyLoss,
-        EEDLDataset,
-        CrossSectionRecord,
-        DistributionRecord,
-    )
-    from pyepics.utils.constants import (
-        PERIODIC_TABLE,
-        ELECTRON_MF_MT,
-        PHOTON_MF_MT,
-        ATOMIC_MF_MT,
-        MF23,
-        MF26,
-        MF27,
-        MF28,
-        ELECTRON_SECTIONS_ABBREVS,
-        PHOTON_SECTIONS_ABBREVS,
-        ATOMIC_SECTIONS_ABBREVS,
-        ELECTRON_SUBSHELL_LABELS,
-        SUBSHELL_DESIGNATORS,
-        FINE_STRUCTURE,
-        ELECTRON_MASS,
-        BARN_TO_CM2,
-        PLANCK_CONSTANT,
-        SPEED_OF_LIGHT,
-        ELECTRON_CHARGE,
-    )
 
     return SimpleNamespace(**locals())
 
@@ -668,7 +625,6 @@ def section_h5_cross_sections(pdf, ctx):
 # -------------------------------------------------------------------
 def section_hdf5_roundtrip(pdf, ctx):
     """Write a synthetic dataset to HDF5 and read it back."""
-    import matplotlib.pyplot as plt
 
     M = ctx["M"]
     _section_title_page(pdf, "7. HDF5 Round-Trip Validation")
@@ -931,7 +887,6 @@ def section_docstring_audit(pdf, ctx):
 # -------------------------------------------------------------------
 def section_summary(pdf, ctx):
     """Final pass/fail summary page."""
-    import matplotlib.pyplot as plt
 
     results = ctx["results"]
 
