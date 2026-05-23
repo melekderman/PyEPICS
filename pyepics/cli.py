@@ -288,6 +288,61 @@ def cmd_all(args):
 # ---------------------------------------------------------------------------
 
 
+def _build_common_parser() -> argparse.ArgumentParser:
+    """Build the shared options parser used as a parent for every subcommand.
+
+    Attaching the common flags to each subparser (rather than to the
+    top-level parser) lets invocations follow the natural
+    ``pyepics <command> --flag value`` order documented in the README.
+    A top-level parent would otherwise refuse flags placed after the
+    subcommand name.
+    """
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--data-dir",
+        "-d",
+        default=".",
+        help="Base data directory (default: current directory)",
+    )
+    common.add_argument(
+        "--libraries",
+        "-l",
+        nargs="+",
+        choices=["electron", "photon", "atomic"],
+        default=None,
+        help="Libraries to process (default: all three)",
+    )
+    common.add_argument(
+        "--z-min",
+        type=int,
+        default=1,
+        help="Minimum atomic number (default: 1)",
+    )
+    common.add_argument(
+        "--z-max",
+        type=int,
+        default=100,
+        help="Maximum atomic number (default: 100)",
+    )
+    common.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing output files",
+    )
+    common.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help="Continue processing after errors",
+    )
+    common.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+    return common
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -298,6 +353,8 @@ def build_parser() -> argparse.ArgumentParser:
 Examples:
     python -m pyepics.cli download                         # download all
     python -m pyepics.cli download --libraries electron    # EEDL only
+    python -m pyepics.cli download --libraries photon      # EPDL only
+    python -m pyepics.cli download --libraries atomic      # EADL only
     python -m pyepics.cli raw                              # raw HDF5 for all
     python -m pyepics.cli mcdc --libraries electron        # MCDC electron only
     python -m pyepics.cli all --z-min 1 --z-max 30         # first 30 elements
@@ -305,57 +362,29 @@ Examples:
 """,
     )
 
-    # Common arguments
-    parser.add_argument(
-        "--data-dir",
-        "-d",
-        default=".",
-        help="Base data directory (default: current directory)",
-    )
-    parser.add_argument(
-        "--libraries",
-        "-l",
-        nargs="*",
-        choices=["electron", "photon", "atomic"],
-        default=None,
-        help="Libraries to process (default: all three)",
-    )
-    parser.add_argument(
-        "--z-min",
-        type=int,
-        default=1,
-        help="Minimum atomic number (default: 1)",
-    )
-    parser.add_argument(
-        "--z-max",
-        type=int,
-        default=100,
-        help="Maximum atomic number (default: 100)",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing output files",
-    )
-    parser.add_argument(
-        "--continue-on-error",
-        action="store_true",
-        help="Continue processing after errors",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Enable debug logging",
-    )
+    common = _build_common_parser()
 
-    # Subcommands
     sub = parser.add_subparsers(dest="command", help="Pipeline step to run")
-
-    sub.add_parser("download", help="Download ENDF files from LLNL")
-    sub.add_parser("raw", help="Create raw HDF5 files")
-    sub.add_parser("mcdc", help="Create MCDC-format HDF5 files")
-    sub.add_parser("all", help="Run raw + mcdc (full pipeline)")
+    sub.add_parser(
+        "download",
+        parents=[common],
+        help="Download ENDF files from LLNL",
+    )
+    sub.add_parser(
+        "raw",
+        parents=[common],
+        help="Create raw HDF5 files",
+    )
+    sub.add_parser(
+        "mcdc",
+        parents=[common],
+        help="Create MCDC-format HDF5 files",
+    )
+    sub.add_parser(
+        "all",
+        parents=[common],
+        help="Run raw + mcdc (full pipeline)",
+    )
 
     return parser
 
@@ -365,16 +394,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.verbose:
+    if args.command is None:
+        parser.print_help()
+        return 0
+
+    # ``--verbose`` is attached to every subparser via the shared parent;
+    # it is only available on *args* when a subcommand has been selected.
+    if getattr(args, "verbose", False):
         logging.basicConfig(
             level=logging.DEBUG, format="%(name)s %(levelname)s: %(message)s"
         )
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    if args.command is None:
-        parser.print_help()
-        return 0
 
     t0 = time.time()
 
