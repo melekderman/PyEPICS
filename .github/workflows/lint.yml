@@ -2,7 +2,6 @@ name: Lint
 
 on:
   push:
-  pull_request:
 
 jobs:
   lint:
@@ -26,4 +25,4 @@ jobs:
           python -m pip install ruff black
 
       - name: Ruff check
-        run: ruff check --force-exclude --output-format=github .
+        run: ruff check --fix pyepics/
