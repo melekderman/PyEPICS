@@ -22,9 +22,11 @@ File Format Assumptions
 -----------------------
 * Standard ENDF-6 fixed-width format.
 * The ``endf`` Python package handles the MF=28 section, exposing a
-  ``subshells`` list of dicts with keys ``SUBI``, ``EBI``, ``ELN``,
-  ``NTR``, and ``transitions`` (each with ``SUBJ``, ``SUBK``, ``ETR``,
-  ``FTR``).
+  ``shells`` list of dicts.  Each shell dict carries the scalars
+  ``SUBI``, ``NTR``, ``EBI``, ``ELN`` plus four parallel arrays
+  ``SUBJ`` / ``SUBK`` / ``ETR`` / ``FTR`` (length ``NTR``), one element
+  per transition.  Individual :class:`SubshellTransition` records are
+  reconstructed here by zipping those arrays.
 
 References
 ----------
@@ -158,15 +160,26 @@ class EADLReader(BaseReader):
             sec = mat.section_data[key]
             n_subshells = int(sec.get("NSS", 0))
 
-            for subshell_rec in sec.get("subshells", []):
-                subi = int(subshell_rec.get("SUBI", 0))
+            # ``endf`` v0.1.x returns the per-shell list under ``shells``;
+            # transition data is exposed as four parallel arrays (``SUBJ``,
+            # ``SUBK``, ``ETR``, ``FTR``) of length ``NTR``, one entry per
+            # transition.  Individual SubshellTransition records are
+            # reconstructed by zipping those arrays element-wise.
+            for shell_rec in sec.get("shells", []):
+                subi = int(shell_rec.get("SUBI", 0))
                 shell_name = SUBSHELL_DESIGNATORS.get(subi, f"S{subi}")
 
-                transitions: list[SubshellTransition] = []
-                for trans in subshell_rec.get("transitions", []):
-                    subj = int(trans.get("SUBJ", 0))
-                    subk = int(trans.get("SUBK", 0))
+                subj_arr = shell_rec.get("SUBJ", ())
+                subk_arr = shell_rec.get("SUBK", ())
+                etr_arr = shell_rec.get("ETR", ())
+                ftr_arr = shell_rec.get("FTR", ())
 
+                transitions: list[SubshellTransition] = []
+                for subj_raw, subk_raw, etr_raw, ftr_raw in zip(
+                    subj_arr, subk_arr, etr_arr, ftr_arr, strict=False,
+                ):
+                    subj = int(subj_raw)
+                    subk = int(subk_raw)
                     transitions.append(
                         SubshellTransition(
                             origin_designator=subj,
@@ -177,8 +190,8 @@ class EADLReader(BaseReader):
                                 if subk == 0
                                 else SUBSHELL_DESIGNATORS.get(subk, f"S{subk}")
                             ),
-                            energy_eV=float(trans.get("ETR", 0.0)),
-                            probability=float(trans.get("FTR", 0.0)),
+                            energy_eV=float(etr_raw),
+                            probability=float(ftr_raw),
                             is_radiative=(subk == 0),
                         )
                     )
@@ -186,14 +199,14 @@ class EADLReader(BaseReader):
                 subshells[shell_name] = SubshellRelaxation(
                     designator=subi,
                     name=shell_name,
-                    binding_energy_eV=float(subshell_rec.get("EBI", 0.0)),
-                    n_electrons=float(subshell_rec.get("ELN", 0.0)),
+                    binding_energy_eV=float(shell_rec.get("EBI", 0.0)),
+                    n_electrons=float(shell_rec.get("ELN", 0.0)),
                     transitions=transitions,
                 )
                 logger.debug(
                     "  Subshell %s: BE=%.2f eV, %d transitions",
                     shell_name,
-                    subshell_rec.get("EBI", 0.0),
+                    shell_rec.get("EBI", 0.0),
                     len(transitions),
                 )
         else:
