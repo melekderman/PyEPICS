@@ -26,10 +26,10 @@ import pytest
 
 from pyepics import cli
 
-
 # ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
+
 
 class TestArgumentParser:
     """Parsing of the documented invocation patterns"""
@@ -55,13 +55,18 @@ class TestArgumentParser:
         assert args.data_dir == "."
 
     @pytest.mark.parametrize(
-        "command", ["download", "raw", "mcdc", "all"],
+        "command",
+        ["download", "raw", "mcdc", "all"],
     )
     @pytest.mark.parametrize(
-        "library", ["electron", "photon", "atomic"],
+        "library",
+        ["electron", "photon", "atomic"],
     )
     def test_libraries_flag_after_subcommand(
-        self, parser, command: str, library: str,
+        self,
+        parser,
+        command: str,
+        library: str,
     ) -> None:
         """The README pattern ``cmd --libraries <name>`` must parse"""
         args = parser.parse_args([command, "--libraries", library])
@@ -113,6 +118,7 @@ class TestArgumentParser:
 # Download subcommand routing
 # ---------------------------------------------------------------------------
 
+
 class TestDownloadRouting:
     """The ``download`` subcommand must call ``download_library`` with
     the right ``(key, out_dir)`` pair for each library selection."""
@@ -125,12 +131,14 @@ class TestDownloadRouting:
             recorded.append((name, str(out_dir)))
 
         monkeypatch.setattr(
-            "pyepics.io.download.download_library", fake_download,
+            "pyepics.io.download.download_library",
+            fake_download,
         )
         return recorded
 
     def test_default_downloads_all_three(
-        self, calls: list[tuple[str, str]],
+        self,
+        calls: list[tuple[str, str]],
     ) -> None:
         rc = cli.main(["download", "--data-dir", "/tmp/x"])
         assert rc == 0
@@ -138,7 +146,8 @@ class TestDownloadRouting:
         assert keys == ["eedl", "epdl", "eadl"]
 
     def test_photon_only_routes_to_epdl(
-        self, calls: list[tuple[str, str]],
+        self,
+        calls: list[tuple[str, str]],
     ) -> None:
         cli.main(["download", "--libraries", "photon", "--data-dir", "/tmp/x"])
         assert len(calls) == 1
@@ -147,7 +156,8 @@ class TestDownloadRouting:
         assert out_dir.endswith("data/endf/epdl")
 
     def test_atomic_only_routes_to_eadl(
-        self, calls: list[tuple[str, str]],
+        self,
+        calls: list[tuple[str, str]],
     ) -> None:
         cli.main(["download", "--libraries", "atomic", "--data-dir", "/tmp/x"])
         assert len(calls) == 1
@@ -156,7 +166,8 @@ class TestDownloadRouting:
         assert out_dir.endswith("data/endf/eadl")
 
     def test_electron_only_routes_to_eedl(
-        self, calls: list[tuple[str, str]],
+        self,
+        calls: list[tuple[str, str]],
     ) -> None:
         cli.main(["download", "--libraries", "electron", "--data-dir", "/tmp/x"])
         assert len(calls) == 1
@@ -165,7 +176,9 @@ class TestDownloadRouting:
         assert out_dir.endswith("data/endf/eedl")
 
     def test_continue_on_error(
-        self, monkeypatch, calls: list[tuple[str, str]],
+        self,
+        monkeypatch,
+        calls: list[tuple[str, str]],
     ) -> None:
         """When ``--continue-on-error`` is set, a failing library does
         not stop the others from being attempted."""
@@ -177,7 +190,8 @@ class TestDownloadRouting:
                 raise RuntimeError("simulated network failure")
 
         monkeypatch.setattr(
-            "pyepics.io.download.download_library", failing_download,
+            "pyepics.io.download.download_library",
+            failing_download,
         )
 
         rc = cli.main(
@@ -196,7 +210,8 @@ class TestDownloadRouting:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(
-            "pyepics.io.download.download_library", failing_download,
+            "pyepics.io.download.download_library",
+            failing_download,
         )
 
         rc = cli.main(["download", "--data-dir", "/tmp/x"])
