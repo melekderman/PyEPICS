@@ -59,7 +59,8 @@ class TestEADLRealParseMetadata:
 
     def test_atomic_weight_ratio(self, eadl_fe_dataset: EADLDataset) -> None:
         assert eadl_fe_dataset.atomic_weight_ratio == pytest.approx(
-            55.3672319, rel=1e-6,
+            55.3672319,
+            rel=1e-6,
         )
 
     def test_za_identifier(self, eadl_fe_dataset: EADLDataset) -> None:
@@ -82,32 +83,37 @@ class TestEADLRealParseSubshells:
         assert eadl_fe_dataset.subshells, "subshells dict must not be empty"
 
     def test_all_expected_shells_present(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         expected = {"K", "L1", "L2", "L3", "M1", "M2", "M3", "M4", "M5", "N1"}
-        assert expected.issubset(eadl_fe_dataset.subshells.keys()), (
-            f"missing shells: {expected - set(eadl_fe_dataset.subshells)}"
-        )
+        assert expected.issubset(
+            eadl_fe_dataset.subshells.keys()
+        ), f"missing shells: {expected - set(eadl_fe_dataset.subshells)}"
 
     def test_k_shell_binding_energy(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         assert eadl_fe_dataset.subshells["K"].binding_energy_eV == pytest.approx(
             7117.0,
         )
 
     def test_k_shell_electrons(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         assert eadl_fe_dataset.subshells["K"].n_electrons == pytest.approx(2.0)
 
     def test_k_shell_designator(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         assert eadl_fe_dataset.subshells["K"].designator == 1
 
     def test_l3_shell_electrons(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         assert eadl_fe_dataset.subshells["L3"].n_electrons == pytest.approx(4.0)
 
@@ -116,20 +122,23 @@ class TestEADLRealParseTransitions:
     """Per-shell transition reconstruction from parallel arrays"""
 
     def test_k_shell_transition_count(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         k = eadl_fe_dataset.subshells["K"]
         assert len(k.transitions) == 48
 
     def test_k_shell_radiative_count(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         k = eadl_fe_dataset.subshells["K"]
         radiative = [t for t in k.transitions if t.is_radiative]
         assert len(radiative) == 6
 
     def test_k_shell_first_transition_is_radiative(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         first = eadl_fe_dataset.subshells["K"].transitions[0]
         assert first.is_radiative is True
@@ -137,7 +146,8 @@ class TestEADLRealParseTransitions:
         assert first.secondary_label == "radiative"
 
     def test_k_shell_first_transition_values(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         """First K-shell transition: SUBJ=3 (L2), ETR=6349.85, FTR=0.101391"""
         first = eadl_fe_dataset.subshells["K"].transitions[0]
@@ -147,14 +157,16 @@ class TestEADLRealParseTransitions:
         assert first.probability == pytest.approx(0.101391)
 
     def test_k_shell_transition_probabilities_sum(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         k = eadl_fe_dataset.subshells["K"]
         total = sum(t.probability for t in k.transitions)
         assert total == pytest.approx(1.0, abs=1e-3)
 
     def test_outer_shell_no_transitions(
-        self, eadl_fe_dataset: EADLDataset,
+        self,
+        eadl_fe_dataset: EADLDataset,
     ) -> None:
         """Outermost shells (NTR=0 in the EADL data) carry no transitions"""
         for name in ("M5", "N1"):

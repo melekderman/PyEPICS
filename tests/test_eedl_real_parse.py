@@ -60,7 +60,8 @@ class TestEEDLRealParseMetadata:
 
     def test_atomic_weight_ratio(self, eedl_fe_dataset: EEDLDataset) -> None:
         assert eedl_fe_dataset.atomic_weight_ratio == pytest.approx(
-            55.3672319, rel=1e-6,
+            55.3672319,
+            rel=1e-6,
         )
 
     def test_za_identifier(self, eedl_fe_dataset: EEDLDataset) -> None:
@@ -71,7 +72,13 @@ class TestEEDLRealParseCrossSections:
     """MF=23 cross sections (electron interactions)"""
 
     expected_labels = (
-        "xs_tot", "xs_ion", "xs_lge", "xs_el", "xs_brem", "xs_exc", "xs_K",
+        "xs_tot",
+        "xs_ion",
+        "xs_lge",
+        "xs_el",
+        "xs_brem",
+        "xs_exc",
+        "xs_K",
     )
 
     def test_cross_sections_populated(self, eedl_fe_dataset: EEDLDataset) -> None:
@@ -79,7 +86,9 @@ class TestEEDLRealParseCrossSections:
 
     @pytest.mark.parametrize("label", expected_labels)
     def test_expected_label_present(
-        self, eedl_fe_dataset: EEDLDataset, label: str,
+        self,
+        eedl_fe_dataset: EEDLDataset,
+        label: str,
     ) -> None:
         assert label in eedl_fe_dataset.cross_sections, (
             f"{label!r} missing from cross_sections "
@@ -87,13 +96,14 @@ class TestEEDLRealParseCrossSections:
         )
 
     def test_arrays_aligned_and_non_empty(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         for label, rec in eedl_fe_dataset.cross_sections.items():
             assert rec.energy.size > 0, f"{label}: empty energy grid"
-            assert rec.energy.shape == rec.cross_section.shape, (
-                f"{label}: energy / xs shape mismatch"
-            )
+            assert (
+                rec.energy.shape == rec.cross_section.shape
+            ), f"{label}: energy / xs shape mismatch"
 
     def test_xs_non_negative(self, eedl_fe_dataset: EEDLDataset) -> None:
         for label, rec in eedl_fe_dataset.cross_sections.items():
@@ -101,12 +111,13 @@ class TestEEDLRealParseCrossSections:
 
     def test_xs_energy_monotonic(self, eedl_fe_dataset: EEDLDataset) -> None:
         for label, rec in eedl_fe_dataset.cross_sections.items():
-            assert np.all(np.diff(rec.energy) >= 0), (
-                f"{label}: energy grid not monotonic"
-            )
+            assert np.all(
+                np.diff(rec.energy) >= 0
+            ), f"{label}: energy grid not monotonic"
 
     def test_xs_total_reference_values(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         """Total electron xs for Fe: 471 points, starts at first-shell BE"""
         xs = eedl_fe_dataset.cross_sections["xs_tot"]
@@ -115,7 +126,8 @@ class TestEEDLRealParseCrossSections:
         assert xs.energy[-1] == pytest.approx(1.0e11)
 
     def test_xs_k_shell_binding_energy(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         """K-shell electroionisation xs starts at the K binding energy"""
         xs_k = eedl_fe_dataset.cross_sections["xs_K"]
@@ -130,14 +142,16 @@ class TestEEDLRealParseDistributions:
         assert "ang_lge" in eedl_fe_dataset.distributions
 
     def test_ang_lge_arrays_aligned(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         rec = eedl_fe_dataset.distributions["ang_lge"]
         assert rec.inc_energy.shape == rec.value.shape == rec.probability.shape
         assert rec.inc_energy.size > 0
 
     def test_ang_lge_cosine_range(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         """Cosine μ values must lie within [-1, +1]"""
         rec = eedl_fe_dataset.distributions["ang_lge"]
@@ -145,26 +159,30 @@ class TestEEDLRealParseDistributions:
         assert rec.value.max() <= 1.0 + 1e-9
 
     def test_excitation_loss_present(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         """MT=528 yields an entry in average_energy_losses"""
         assert "loss_exc" in eedl_fe_dataset.average_energy_losses
 
     def test_excitation_loss_arrays_aligned(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         rec = eedl_fe_dataset.average_energy_losses["loss_exc"]
         assert rec.energy.shape == rec.avg_loss.shape
         assert rec.energy.size > 0
 
     def test_bremsstrahlung_spectra_present(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         """MT=527 photon spectrum populates bremsstrahlung_spectra"""
         assert eedl_fe_dataset.bremsstrahlung_spectra is not None
 
     def test_bremsstrahlung_spectra_arrays_aligned(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         rec = eedl_fe_dataset.bremsstrahlung_spectra
         assert rec is not None
@@ -172,7 +190,8 @@ class TestEEDLRealParseDistributions:
         assert rec.inc_energy.size > 0
 
     def test_subshell_spectrum_present(
-        self, eedl_fe_dataset: EEDLDataset,
+        self,
+        eedl_fe_dataset: EEDLDataset,
     ) -> None:
         """MT=534 (K-shell energy spectrum) is populated"""
         assert "spec_K" in eedl_fe_dataset.distributions

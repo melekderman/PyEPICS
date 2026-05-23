@@ -47,8 +47,11 @@ class TestEPDLDataset:
     def test_scattering_function(self, sample_epdl_dataset: EPDLDataset) -> None:
         assert "sf_incoherent" in sample_epdl_dataset.form_factors
 
-    def test_cross_section_values_positive(self, sample_epdl_dataset: EPDLDataset) -> None:
+    def test_cross_section_values_positive(
+        self, sample_epdl_dataset: EPDLDataset
+    ) -> None:
         import numpy as np
+
         for key, rec in sample_epdl_dataset.cross_sections.items():
             assert np.all(rec.cross_section >= 0), f"{key} has negative values"
 

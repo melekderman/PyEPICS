@@ -176,7 +176,11 @@ class EADLReader(BaseReader):
 
                 transitions: list[SubshellTransition] = []
                 for subj_raw, subk_raw, etr_raw, ftr_raw in zip(
-                    subj_arr, subk_arr, etr_arr, ftr_arr, strict=False,
+                    subj_arr,
+                    subk_arr,
+                    etr_arr,
+                    ftr_arr,
+                    strict=False,
                 ):
                     subj = int(subj_raw)
                     subk = int(subk_raw)

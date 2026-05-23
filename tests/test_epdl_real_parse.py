@@ -74,9 +74,9 @@ class TestEPDLRealParseCrossSections:
 
     def test_xs_arrays_aligned(self, epdl_fe_dataset: EPDLDataset) -> None:
         for label, rec in epdl_fe_dataset.cross_sections.items():
-            assert rec.energy.shape == rec.cross_section.shape, (
-                f"{label}: energy / xs shape mismatch"
-            )
+            assert (
+                rec.energy.shape == rec.cross_section.shape
+            ), f"{label}: energy / xs shape mismatch"
             assert rec.energy.size > 0, f"{label}: empty energy grid"
 
     def test_xs_values_non_negative(self, epdl_fe_dataset: EPDLDataset) -> None:
@@ -99,7 +99,9 @@ class TestEPDLRealParseFormFactors:
 
     @pytest.mark.parametrize("label", expected_labels)
     def test_expected_label_present(
-        self, epdl_fe_dataset: EPDLDataset, label: str,
+        self,
+        epdl_fe_dataset: EPDLDataset,
+        label: str,
     ) -> None:
         assert label in epdl_fe_dataset.form_factors, (
             f"{label!r} missing from form_factors "
@@ -108,14 +110,17 @@ class TestEPDLRealParseFormFactors:
 
     @pytest.mark.parametrize("label", expected_labels)
     def test_arrays_aligned_and_non_empty(
-        self, epdl_fe_dataset: EPDLDataset, label: str,
+        self,
+        epdl_fe_dataset: EPDLDataset,
+        label: str,
     ) -> None:
         rec = epdl_fe_dataset.form_factors[label]
         assert rec.x.size > 0, f"{label}: empty x array"
         assert rec.x.shape == rec.y.shape, f"{label}: x / y shape mismatch"
 
     def test_ff_coherent_reference_values(
-        self, epdl_fe_dataset: EPDLDataset,
+        self,
+        epdl_fe_dataset: EPDLDataset,
     ) -> None:
         """Coherent form factor F(x=0) equals Z (=26) for Fe"""
         ff = epdl_fe_dataset.form_factors["ff_coherent"]
@@ -125,7 +130,8 @@ class TestEPDLRealParseFormFactors:
         assert ff.x[-1] == pytest.approx(1.0e9)
 
     def test_sf_incoherent_reference_values(
-        self, epdl_fe_dataset: EPDLDataset,
+        self,
+        epdl_fe_dataset: EPDLDataset,
     ) -> None:
         """Incoherent scattering function S(x=0)=0 and S(∞)=Z=26 for Fe"""
         sf = epdl_fe_dataset.form_factors["sf_incoherent"]
@@ -134,7 +140,8 @@ class TestEPDLRealParseFormFactors:
         assert sf.y[-1] == pytest.approx(26.0)
 
     def test_asf_real_reference_values(
-        self, epdl_fe_dataset: EPDLDataset,
+        self,
+        epdl_fe_dataset: EPDLDataset,
     ) -> None:
         """Real anomalous scattering factor — first y value matches LLNL data"""
         asf = epdl_fe_dataset.form_factors["asf_real"]
@@ -142,7 +149,8 @@ class TestEPDLRealParseFormFactors:
         assert asf.y[0] == pytest.approx(-26.0059225, rel=1e-6)
 
     def test_asf_imag_reference_size(
-        self, epdl_fe_dataset: EPDLDataset,
+        self,
+        epdl_fe_dataset: EPDLDataset,
     ) -> None:
         asf = epdl_fe_dataset.form_factors["asf_imag"]
         assert asf.x.size == 361

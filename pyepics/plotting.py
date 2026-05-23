@@ -31,6 +31,7 @@ def _import_matplotlib():
     """Import matplotlib or raise a helpful error."""
     try:
         import matplotlib.pyplot as plt
+
         return plt
     except ImportError:
         raise ImportError(
@@ -105,9 +106,7 @@ def plot_cross_sections(
 
     ax.set_xlabel("Energy (eV)")
     ax.set_ylabel("Cross Section (barns)")
-    ax.set_title(
-        title or f"{ep.symbol} (Z={ep.Z}) — {lib_upper} Cross Sections"
-    )
+    ax.set_title(title or f"{ep.symbol} (Z={ep.Z}) — {lib_upper} Cross Sections")
     ax.legend(fontsize="small", ncol=2)
     ax.grid(True, which="both", alpha=0.3)
 
@@ -165,6 +164,7 @@ def compare_cross_sections(
         except (KeyError, Exception):
             continue
         from pyepics.client import _resolve_element
+
         z, sym = _resolve_element(elem)
         ax.plot(energy, xs, label=f"{sym} (Z={z})")
 
@@ -220,7 +220,6 @@ def plot_binding_energies(
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
-
 
     # Collect data: subshell -> [(Z, BE)]
     data: dict[str, list[tuple[int, float]]] = {}

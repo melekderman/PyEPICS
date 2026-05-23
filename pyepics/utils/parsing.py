@@ -75,6 +75,7 @@ such as ``EEDL.ZA026000.endf`` (iron, Z = 26).
 # Numeric conversion
 # ---------------------------------------------------------------------------
 
+
 def float_endf(s: str) -> float:
     """Convert an ENDF-6 formatted string to a Python float
 
@@ -168,6 +169,7 @@ def int_endf(s: str) -> int:
 # MF=26 / MT=525 raw-text parser
 # ---------------------------------------------------------------------------
 
+
 def parse_mf26_mt525(raw: str) -> list[dict]:
     """Parse MF=26, MT=525 large-angle elastic angular distribution data
 
@@ -242,7 +244,8 @@ def parse_mf26_mt525(raw: str) -> list[dict]:
         if len(cont) < ENDF_DATA_WIDTH:
             logger.warning(
                 "CONT line %d shorter than %d chars, padding with spaces",
-                i, ENDF_DATA_WIDTH,
+                i,
+                ENDF_DATA_WIDTH,
             )
             cont = cont.ljust(ENDF_DATA_WIDTH)
 
@@ -281,6 +284,7 @@ def parse_mf26_mt525(raw: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Interpolation and PDF helpers
 # ---------------------------------------------------------------------------
+
 
 def linear_interpolation(
     target_grid: np.ndarray,
@@ -423,6 +427,7 @@ def build_pdf(
 # ---------------------------------------------------------------------------
 # Screened Rutherford small-angle scattering
 # ---------------------------------------------------------------------------
+
 
 def small_angle_eta(Z: int, energy_eV: np.ndarray) -> np.ndarray:
     """Compute the screened Rutherford parameter η for small-angle scattering
@@ -572,6 +577,7 @@ def small_angle_scattering_cosine(
 # ---------------------------------------------------------------------------
 # File-path helpers
 # ---------------------------------------------------------------------------
+
 
 def extract_atomic_number_from_path(path: Path) -> int:
     """Extract the atomic number Z from an EPICS/ENDF file path

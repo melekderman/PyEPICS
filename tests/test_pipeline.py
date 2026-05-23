@@ -35,10 +35,10 @@ from pyepics.converters.mcdc_hdf5 import (
 )
 from pyepics.models.records import EADLDataset, EEDLDataset, EPDLDataset
 
-
 # -----------------------------------------------------------------------
 # Raw EEDL
 # -----------------------------------------------------------------------
+
 
 class TestRawEEDL:
     """Test raw EEDL HDF5 output."""
@@ -104,6 +104,7 @@ class TestRawEEDL:
 # MCDC EEDL
 # -----------------------------------------------------------------------
 
+
 class TestMcdcEEDL:
     """Test MCDC EEDL HDF5 output."""
 
@@ -158,6 +159,7 @@ class TestMcdcEEDL:
 # Raw EPDL
 # -----------------------------------------------------------------------
 
+
 class TestRawEPDL:
     """Test raw EPDL HDF5 output."""
 
@@ -179,6 +181,7 @@ class TestRawEPDL:
 # -----------------------------------------------------------------------
 # MCDC EPDL
 # -----------------------------------------------------------------------
+
 
 class TestMcdcEPDL:
     """Test MCDC EPDL HDF5 output."""
@@ -203,6 +206,7 @@ class TestMcdcEPDL:
 # Raw EADL
 # -----------------------------------------------------------------------
 
+
 class TestRawEADL:
     """Test raw EADL HDF5 output."""
 
@@ -226,6 +230,7 @@ class TestRawEADL:
 # -----------------------------------------------------------------------
 # MCDC EADL
 # -----------------------------------------------------------------------
+
 
 class TestMcdcEADL:
     """Test MCDC EADL HDF5 output."""
@@ -262,11 +267,16 @@ class TestMcdcEADL:
 # Combined MCDC (one file with electron + photon + atomic)
 # -----------------------------------------------------------------------
 
+
 class TestMcdcCombined:
     """Test combined MCDC HDF5 output (all libraries in one file)."""
 
     def test_creates_file(
-        self, tmp_path, sample_eedl_dataset, sample_epdl_dataset, sample_eadl_dataset,
+        self,
+        tmp_path,
+        sample_eedl_dataset,
+        sample_epdl_dataset,
+        sample_eadl_dataset,
     ):
         out = tmp_path / "combined.h5"
         with h5py.File(str(out), "w") as h5f:
@@ -279,7 +289,11 @@ class TestMcdcCombined:
         assert out.exists()
 
     def test_has_all_three_groups(
-        self, tmp_path, sample_eedl_dataset, sample_epdl_dataset, sample_eadl_dataset,
+        self,
+        tmp_path,
+        sample_eedl_dataset,
+        sample_epdl_dataset,
+        sample_eadl_dataset,
     ):
         """A combined file must contain electron, photon, and atomic groups."""
         out = tmp_path / "combined.h5"
@@ -296,7 +310,11 @@ class TestMcdcCombined:
             assert "atomic_relaxation" in h5f
 
     def test_shared_metadata(
-        self, tmp_path, sample_eedl_dataset, sample_epdl_dataset, sample_eadl_dataset,
+        self,
+        tmp_path,
+        sample_eedl_dataset,
+        sample_epdl_dataset,
+        sample_eadl_dataset,
     ):
         """Metadata should be written exactly once (no duplicates)."""
         out = tmp_path / "combined.h5"
@@ -321,7 +339,9 @@ class TestMcdcCombined:
             assert "photon_reactions" not in h5f
             assert "atomic_relaxation" not in h5f
 
-    def test_partial_photon_atomic(self, tmp_path, sample_epdl_dataset, sample_eadl_dataset):
+    def test_partial_photon_atomic(
+        self, tmp_path, sample_epdl_dataset, sample_eadl_dataset
+    ):
         """Should work with photon + atomic only."""
         out = tmp_path / "combined_pa.h5"
         with h5py.File(str(out), "w") as h5f:
@@ -334,6 +354,7 @@ class TestMcdcCombined:
     def test_no_datasets_raises(self):
         """Must raise ValueError when no data is provided."""
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".h5") as tmp:
             with h5py.File(tmp.name, "w") as h5f:
                 with pytest.raises(ValueError, match="At least one dataset"):

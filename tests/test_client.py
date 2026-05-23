@@ -36,7 +36,6 @@ from pyepics.models.records import (
     SubshellTransition,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers — re-use conftest-style synthetic datasets
 # ---------------------------------------------------------------------------
@@ -205,7 +204,9 @@ class TestElementProperties:
 
     def test_basic_attributes(self):
         ep = ElementProperties(
-            26, "Fe", "Iron",
+            26,
+            "Fe",
+            "Iron",
             electron=_make_eedl(),
             photon=_make_epdl(),
             atomic=_make_eadl(),
@@ -250,7 +251,9 @@ class TestElementProperties:
 
     def test_to_dict(self):
         ep = ElementProperties(
-            26, "Fe", "Iron",
+            26,
+            "Fe",
+            "Iron",
             electron=_make_eedl(),
             atomic=_make_eadl(),
         )
@@ -293,9 +296,21 @@ class TestEPICSClient:
         """Client with pre-populated cache (no real files needed)."""
         client = EPICSClient(tmp_path)
         # Pre-fill cache
-        client._cache[26] = (_make_eedl(26, "Fe"), _make_epdl(26, "Fe"), _make_eadl(26, "Fe"))
-        client._cache[29] = (_make_eedl(29, "Cu"), _make_epdl(29, "Cu"), _make_eadl(29, "Cu"))
-        client._cache[79] = (_make_eedl(79, "Au"), _make_epdl(79, "Au"), _make_eadl(79, "Au"))
+        client._cache[26] = (
+            _make_eedl(26, "Fe"),
+            _make_epdl(26, "Fe"),
+            _make_eadl(26, "Fe"),
+        )
+        client._cache[29] = (
+            _make_eedl(29, "Cu"),
+            _make_epdl(29, "Cu"),
+            _make_eadl(29, "Cu"),
+        )
+        client._cache[79] = (
+            _make_eedl(79, "Au"),
+            _make_epdl(79, "Au"),
+            _make_eadl(79, "Au"),
+        )
         return client
 
     def test_get_element_by_symbol(self, mock_client):
@@ -325,9 +340,7 @@ class TestEPICSClient:
         assert symbols == ["Fe", "Cu", "Au"]
 
     def test_compare_with_properties_filter(self, mock_client):
-        rows = mock_client.compare(
-            ["Fe", "Cu"], properties=["Z", "symbol"]
-        )
+        rows = mock_client.compare(["Fe", "Cu"], properties=["Z", "symbol"])
         assert all(set(r.keys()) == {"Z", "symbol"} for r in rows)
 
     def test_get_cross_section(self, mock_client):
@@ -444,27 +457,21 @@ class TestPlotting:
         pytest.importorskip("matplotlib")
         from pyepics.plotting import compare_cross_sections
 
-        ax = compare_cross_sections(
-            mock_client, ["Fe", "Cu"], "xs_tot", show=False
-        )
+        ax = compare_cross_sections(mock_client, ["Fe", "Cu"], "xs_tot", show=False)
         assert ax is not None
 
     def test_plot_binding_energies(self, mock_client):
         pytest.importorskip("matplotlib")
         from pyepics.plotting import plot_binding_energies
 
-        ax = plot_binding_energies(
-            mock_client, ["Fe", "Cu"], show=False
-        )
+        ax = plot_binding_energies(mock_client, ["Fe", "Cu"], show=False)
         assert ax is not None
 
     def test_plot_binding_energies_single_subshell(self, mock_client):
         pytest.importorskip("matplotlib")
         from pyepics.plotting import plot_binding_energies
 
-        ax = plot_binding_energies(
-            mock_client, ["Fe", "Cu"], subshell="K", show=False
-        )
+        ax = plot_binding_energies(mock_client, ["Fe", "Cu"], subshell="K", show=False)
         assert ax is not None
 
     def test_plot_shell_binding_energies(self, mock_client):

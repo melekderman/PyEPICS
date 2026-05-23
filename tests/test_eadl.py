@@ -36,7 +36,9 @@ class TestEADLDataset:
         assert "K" in sample_eadl_dataset.subshells
 
     def test_k_binding_energy(self, sample_eadl_dataset: EADLDataset) -> None:
-        assert sample_eadl_dataset.subshells["K"].binding_energy_eV == pytest.approx(7112.0)
+        assert sample_eadl_dataset.subshells["K"].binding_energy_eV == pytest.approx(
+            7112.0
+        )
 
     def test_k_transitions(self, sample_eadl_dataset: EADLDataset) -> None:
         k_shell = sample_eadl_dataset.subshells["K"]
@@ -46,12 +48,16 @@ class TestEADLDataset:
         assert len(rad) == 1
         assert len(aug) == 1
 
-    def test_radiative_transition_energy(self, sample_eadl_dataset: EADLDataset) -> None:
+    def test_radiative_transition_energy(
+        self, sample_eadl_dataset: EADLDataset
+    ) -> None:
         k_shell = sample_eadl_dataset.subshells["K"]
         rad = [t for t in k_shell.transitions if t.is_radiative][0]
         assert rad.energy_eV == pytest.approx(6391.0)
 
-    def test_transition_probabilities_sum(self, sample_eadl_dataset: EADLDataset) -> None:
+    def test_transition_probabilities_sum(
+        self, sample_eadl_dataset: EADLDataset
+    ) -> None:
         k_shell = sample_eadl_dataset.subshells["K"]
         total = sum(t.probability for t in k_shell.transitions)
         assert total == pytest.approx(1.0, abs=0.01)

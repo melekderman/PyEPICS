@@ -88,6 +88,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _write_raw_metadata(h5f: h5py.File, dataset) -> None:
     """Write ``/metadata`` group."""
     meta = h5f.create_group("metadata")
@@ -113,7 +114,9 @@ def _write_ff_record(grp: h5py.Group, rec: FormFactorRecord) -> None:
     """Write a form-factor record with breakpoint/interpolation info."""
     ds_x = grp.create_dataset("momentum_transfer", data=rec.x)
     ds_x.attrs["units"] = "1/angstrom"
-    grp.create_dataset("form_factor" if "ff_" in rec.label else "scattering_function", data=rec.y)
+    grp.create_dataset(
+        "form_factor" if "ff_" in rec.label else "scattering_function", data=rec.y
+    )
     if rec.breakpoints is not None:
         grp.create_dataset("breakpoints", data=rec.breakpoints)
     if rec.interpolation is not None:
@@ -123,6 +126,7 @@ def _write_ff_record(grp: h5py.Group, rec: FormFactorRecord) -> None:
 # ---------------------------------------------------------------------------
 # EEDL raw writer
 # ---------------------------------------------------------------------------
+
 
 def write_raw_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     """Write a raw EEDL dataset preserving all original data
@@ -207,6 +211,7 @@ def write_raw_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
 # EPDL raw writer
 # ---------------------------------------------------------------------------
 
+
 def write_raw_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     """Write a raw EPDL dataset preserving all original data
 
@@ -253,9 +258,13 @@ def write_raw_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
     if "xs_pair_total" in xs:
         _write_xs_record(ppg.create_group("cross_section/total"), xs["xs_pair_total"])
     if "xs_pair_nuclear" in xs:
-        _write_xs_record(ppg.create_group("cross_section/nuclear"), xs["xs_pair_nuclear"])
+        _write_xs_record(
+            ppg.create_group("cross_section/nuclear"), xs["xs_pair_nuclear"]
+        )
     if "xs_pair_electron" in xs:
-        _write_xs_record(ppg.create_group("cross_section/electron"), xs["xs_pair_electron"])
+        _write_xs_record(
+            ppg.create_group("cross_section/electron"), xs["xs_pair_electron"]
+        )
 
     # --- Form factors (anomalous) ---
     if "ff_anomalous_imag" in ff or "ff_anomalous_real" in ff:
@@ -276,6 +285,7 @@ def write_raw_epdl(h5f: h5py.File, dataset: EPDLDataset) -> None:
 # ---------------------------------------------------------------------------
 # EADL raw writer
 # ---------------------------------------------------------------------------
+
 
 def write_raw_eadl(h5f: h5py.File, dataset: EADLDataset) -> None:
     """Write a raw EADL dataset preserving all original data
@@ -318,7 +328,9 @@ def write_raw_eadl(h5f: h5py.File, dataset: EADLDataset) -> None:
         )
         tg.create_dataset(
             "secondary_designator",
-            data=np.array([t.secondary_designator for t in shell.transitions], dtype="i4"),
+            data=np.array(
+                [t.secondary_designator for t in shell.transitions], dtype="i4"
+            ),
         )
         ds_e = tg.create_dataset(
             "energy_eV",
