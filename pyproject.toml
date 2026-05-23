@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "epics"
-version = "1.0.0"
+version = "1.0.1.dev1"
 description = "Python library for reading and converting EPICS (Electron Photon Interaction Cross Sections) nuclear data"
 readme = "README.md"
 license = {text = "BSD-3-Clause"}
