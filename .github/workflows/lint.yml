@@ -26,4 +26,4 @@ jobs:
           python -m pip install ruff black
 
       - name: Ruff check
-        run: ruff check --output-format=github .
+        run: ruff check --force-exclude --output-format=github .

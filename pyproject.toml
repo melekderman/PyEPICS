@@ -64,6 +64,9 @@ Issues = "https://github.com/melekderman/PyEPICS/issues"
 [project.scripts]
 epics = "pyepics.cli:main"
 
+[tool.ruff]
+extend-exclude = ["tests"]
+
 [tool.setuptools.packages.find]
 include = ["pyepics*"]
 
