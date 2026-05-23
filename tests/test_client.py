@@ -12,14 +12,15 @@ and the optional plotting module.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
 from pyepics.client import (
-    ElementProperties,
     EPICSClient,
+    ElementProperties,
     _resolve_element,
 )
 from pyepics.exceptions import ValidationError

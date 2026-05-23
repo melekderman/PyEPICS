@@ -22,17 +22,18 @@ try:
 except ImportError:
     pytest.skip("h5py not installed", allow_module_level=True)
 
-from pyepics.converters.mcdc_hdf5 import (
-    write_mcdc_combined,
-    write_mcdc_eadl,
-    write_mcdc_eedl,
-    write_mcdc_epdl,
-)
 from pyepics.converters.raw_hdf5 import (
-    write_raw_eadl,
     write_raw_eedl,
     write_raw_epdl,
+    write_raw_eadl,
 )
+from pyepics.converters.mcdc_hdf5 import (
+    write_mcdc_eedl,
+    write_mcdc_epdl,
+    write_mcdc_eadl,
+    write_mcdc_combined,
+)
+from pyepics.models.records import EADLDataset, EEDLDataset, EPDLDataset
 
 # -----------------------------------------------------------------------
 # Raw EEDL
