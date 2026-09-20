@@ -11,6 +11,7 @@ license = {text = "BSD-3-Clause"}
 requires-python = ">=3.11"
 authors = [
     {name = "Melek Derman", email = "dermanm@oregonstate.edu"},
+    {name = "Todd S. Palmer", email = "Todd.Palmer@oregonstate.edu"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
