@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -----------------------------------------------------------------------------
-# Copyright (c) 2026 Melek Derman
+# Copyright (c) 2026 CARRE
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
@@ -83,6 +83,43 @@ def _create_xs_dataset(
     return ds
 
 
+def _multi_cdf_from_pdf(offset, value, pdf):
+    """Per-table trapezoidal CDF from a flattened piecewise-linear PDF.
+
+    Mirrors MC/DC's ``multi_cdf_from_pdf`` (mcdc/object_/util.py) so the emitted
+    CDF matches exactly what the transport code expects: each energy table runs
+    cumulatively from 0 to 1 over its cosine grid.
+
+    Parameters
+    ----------
+    offset : array_like of int
+        Start index of each table into the flattened arrays.
+    value, pdf : ndarray
+        Flattened sample values (cosines) and piecewise-linear PDF values.
+
+    Returns
+    -------
+    ndarray
+        Flattened CDF, same shape as ``pdf``.
+    """
+    offset = np.asarray(offset)
+    value = np.asarray(value, dtype="f8")
+    pdf = np.asarray(pdf, dtype="f8")
+    cdf = np.zeros_like(pdf)
+    n = len(offset)
+    for i in range(n):
+        start = int(offset[i])
+        end = int(offset[i + 1]) if i < n - 1 else len(pdf)
+        for idx in range(start, end - 1):
+            cdf[idx + 1] = cdf[idx] + 0.5 * (pdf[idx] + pdf[idx + 1]) * (
+                value[idx + 1] - value[idx]
+            )
+        norm = cdf[end - 1]
+        if norm > 0.0:
+            cdf[start:end] /= norm
+    return cdf
+
+
 def _write_mcdc_metadata(h5f: h5py.File, dataset) -> None:
     """Write top-level metadata expected by MC/DC.
 
@@ -156,13 +193,23 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     total_grp = root.create_group("total")
     _create_xs_dataset(total_grp, "xs", total_xs, "barns")
 
-    # --- Elastic scattering ---
+    # --- Elastic scattering (MT526) ---
+    # MC/DC iterates "MT*" subgroups under each reaction and reads, per MT:
+    #   attrs["MT"], xs (+ xs.attrs["offset"]), reference_frame, and for elastic
+    #   large_angle/{xs, xs_energy, scattering_cosine/{value, energy_grid,
+    #   energy_offset, CDF}}.  Angular tables are stored as CDFs (MC/DC uses
+    #   histogram sampling on the CDF branch); see _multi_cdf_from_pdf.
     es_grp = root.create_group("elastic_scattering")
-    _create_xs_dataset(es_grp, "xs", xs_sc_total, "barns")
+    mt_grp = es_grp.create_group("MT526")
+    mt_grp.attrs["MT"] = np.int64(526)
+    xs_ds = _create_xs_dataset(mt_grp, "xs", xs_sc_total, "barns")
+    xs_ds.attrs["offset"] = np.int64(0)
+    mt_grp.create_dataset("reference_frame", data=np.bytes_("LAB"))
 
     # Large angle
-    la_grp = es_grp.create_group("large_angle")
+    la_grp = mt_grp.create_group("large_angle")
     _create_xs_dataset(la_grp, "xs", xs_sc_la, "barns")
+    _create_xs_dataset(la_grp, "xs_energy", xs_energy_grid, "eV")
     if "ang_lge" in dist:
         d = dist["ang_lge"]
         eg, off, val, PDF = build_pdf(d.inc_energy, d.value, d.probability)
@@ -170,9 +217,9 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
         _create_xs_dataset(sc_grp, "energy_grid", eg, "eV")
         sc_grp.create_dataset("energy_offset", data=off)
         sc_grp.create_dataset("value", data=val)
-        sc_grp.create_dataset("PDF", data=PDF)
+        sc_grp.create_dataset("CDF", data=_multi_cdf_from_pdf(off, val, PDF))
 
-    # Small angle
+    # Small angle (MC/DC samples this region analytically; kept for provenance)
     sa_grp = es_grp.create_group("small_angle")
     _create_xs_dataset(sa_grp, "xs", xs_sc_sa, "barns")
     mask_sa = xs_sc_sa > 0.0
@@ -186,35 +233,48 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
         _create_xs_dataset(sc_grp_sa, "energy_grid", eg_sa, "eV")
         sc_grp_sa.create_dataset("energy_offset", data=off_sa)
         sc_grp_sa.create_dataset("value", data=val_sa)
-        sc_grp_sa.create_dataset("PDF", data=pdf_sa)
+        sc_grp_sa.create_dataset(
+            "CDF", data=_multi_cdf_from_pdf(off_sa, val_sa, pdf_sa)
+        )
 
-    # --- Bremsstrahlung ---
+    # --- Bremsstrahlung (MT527) ---
     brem_grp = root.create_group("bremsstrahlung")
-    _create_xs_dataset(brem_grp, "xs", xs_brem, "barns")
+    brem_mt = brem_grp.create_group("MT527")
+    brem_mt.attrs["MT"] = np.int64(527)
+    _create_xs_dataset(brem_mt, "xs", xs_brem, "barns").attrs["offset"] = np.int64(0)
+    brem_mt.create_dataset("reference_frame", data=np.bytes_("LAB"))
     if "loss_brem_spec" in ael:
         a = ael["loss_brem_spec"]
-        el_grp = brem_grp.create_group("energy_loss")
+        el_grp = brem_mt.create_group("energy_loss")
         _create_xs_dataset(el_grp, "energy", a.energy, "eV")
         _create_xs_dataset(el_grp, "value", a.avg_loss, "eV")
 
-    # --- Excitation ---
+    # --- Excitation (MT528) ---
     exc_grp = root.create_group("excitation")
-    _create_xs_dataset(exc_grp, "xs", xs_exc, "barns")
+    exc_mt = exc_grp.create_group("MT528")
+    exc_mt.attrs["MT"] = np.int64(528)
+    _create_xs_dataset(exc_mt, "xs", xs_exc, "barns").attrs["offset"] = np.int64(0)
+    exc_mt.create_dataset("reference_frame", data=np.bytes_("LAB"))
     if "loss_exc" in ael:
         a = ael["loss_exc"]
-        el_grp = exc_grp.create_group("energy_loss")
+        el_grp = exc_mt.create_group("energy_loss")
         _create_xs_dataset(el_grp, "energy", a.energy, "eV")
         _create_xs_dataset(el_grp, "value", a.avg_loss, "eV")
 
-    # --- Ionization ---
+    # --- Ionization (MT522) ---
     ion_grp = root.create_group("ionization")
-    _create_xs_dataset(ion_grp, "xs", xs_ion_total, "barns")
-    subs_grp = ion_grp.create_group("subshells")
+    ion_mt = ion_grp.create_group("MT522")
+    ion_mt.attrs["MT"] = np.int64(522)
+    _create_xs_dataset(ion_mt, "xs", xs_ion_total, "barns").attrs["offset"] = np.int64(0)
+    ion_mt.create_dataset("reference_frame", data=np.bytes_("LAB"))
+    subs_grp = ion_mt.create_group("subshells")
 
     for _mt, shell_label in ELECTRON_SUBSHELL_LABELS.items():
         xs_key = f"xs_{shell_label}"
         spec_key = f"spec_{shell_label}"
-        if xs_key not in xs:
+        # MC/DC requires a product spectrum for every listed subshell, so skip
+        # subshells that lack either a cross section or a secondary spectrum.
+        if xs_key not in xs or spec_key not in dist:
             continue
 
         shell_xs = linear_interpolation(
@@ -222,23 +282,23 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
             xs[xs_key].energy,
             xs[xs_key].cross_section,
         )
-        sg = subs_grp.create_group(shell_label)
+        sg = subs_grp.create_group(f"MT-{_mt}")
         _create_xs_dataset(sg, "xs", shell_xs, "barns")
+        _create_xs_dataset(sg, "energy_grid", xs_energy_grid, "eV")
 
-        # Binding energy (last point of the shell xs energy grid)
+        # Binding energy (first point of the shell xs energy grid)
         sg.create_dataset(
             "binding_energy",
             data=np.float64(xs[xs_key].energy[0]),
         )
 
-        if spec_key in dist:
-            d = dist[spec_key]
-            egp, offp, valp, PDFp = build_pdf(d.inc_energy, d.value, d.probability)
-            pg = sg.create_group("product")
-            _create_xs_dataset(pg, "energy_grid", egp, "eV")
-            pg.create_dataset("energy_offset", data=offp)
-            pg.create_dataset("value", data=valp)
-            pg.create_dataset("PDF", data=PDFp)
+        d = dist[spec_key]
+        egp, offp, valp, PDFp = build_pdf(d.inc_energy, d.value, d.probability)
+        pg = sg.create_group("product")
+        _create_xs_dataset(pg, "energy_grid", egp, "eV")
+        pg.create_dataset("energy_offset", data=offp)
+        pg.create_dataset("value", data=valp)
+        pg.create_dataset("CDF", data=_multi_cdf_from_pdf(offp, valp, PDFp))
 
     logger.debug("Wrote MCDC EEDL for Z=%d", Z)
 

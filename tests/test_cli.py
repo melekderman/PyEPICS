@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -----------------------------------------------------------------------------
-# Copyright (c) 2026 Melek Derman
+# Copyright (c) 2026 CARRE
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
@@ -217,3 +217,133 @@ class TestDownloadRouting:
         rc = cli.main(["download", "--data-dir", "/tmp/x"])
         assert attempts == ["eedl"]
         assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# raw / mcdc / all library selection (command behavior, not just parsing)
+# ---------------------------------------------------------------------------
+
+
+class TestLibrarySelectionBehavior:
+    """The ``--libraries`` flag must restrict which libraries are actually
+    processed by ``raw``, ``mcdc``, and ``all`` — not merely parse.
+
+    Regression guard for a bug where ``cmd_mcdc`` ignored
+    ``--libraries`` entirely and always combined EEDL + EPDL + EADL.
+    """
+
+    @pytest.fixture
+    def data_dir(self, tmp_path):
+        """A data directory with placeholder ENDF files for all three
+        libraries at Z=1, so file discovery succeeds for every library."""
+        for sub, prefix in [
+            ("data/endf/eedl", "EEDL"),
+            ("data/endf/epdl", "EPDL"),
+            ("data/endf/eadl", "EADL"),
+        ]:
+            d = tmp_path / sub
+            d.mkdir(parents=True)
+            (d / f"{prefix}.ZA001000.endf").write_text("placeholder")
+        return tmp_path
+
+    @pytest.fixture
+    def raw_calls(self, monkeypatch):
+        """Record the dataset types passed to ``create_raw_hdf5``."""
+        recorded: list[str] = []
+
+        def fake_raw(dataset_type, *args, **kwargs):
+            recorded.append(dataset_type)
+
+        monkeypatch.setattr(
+            "pyepics.converters.hdf5.create_raw_hdf5",
+            fake_raw,
+        )
+        return recorded
+
+    @pytest.fixture
+    def mcdc_calls(self, monkeypatch):
+        """Record which library paths reach ``create_combined_mcdc_hdf5``."""
+        recorded: list[dict] = []
+
+        def fake_combined(
+            Z,
+            out_path,
+            *,
+            eedl_path=None,
+            epdl_path=None,
+            eadl_path=None,
+            validate=True,
+            overwrite=False,
+        ):
+            recorded.append(
+                {
+                    "Z": Z,
+                    "eedl": eedl_path is not None,
+                    "epdl": epdl_path is not None,
+                    "eadl": eadl_path is not None,
+                }
+            )
+
+        monkeypatch.setattr(
+            "pyepics.converters.hdf5.create_combined_mcdc_hdf5",
+            fake_combined,
+        )
+        return recorded
+
+    # -- raw -----------------------------------------------------------
+
+    def test_raw_electron_only(self, data_dir, raw_calls) -> None:
+        rc = cli.main(
+            ["raw", "--libraries", "electron", "--data-dir", str(data_dir),
+             "--z-min", "1", "--z-max", "1"]
+        )
+        assert rc == 0
+        assert raw_calls == ["EEDL"]
+
+    def test_raw_default_all_three(self, data_dir, raw_calls) -> None:
+        rc = cli.main(
+            ["raw", "--data-dir", str(data_dir), "--z-min", "1", "--z-max", "1"]
+        )
+        assert rc == 0
+        assert raw_calls == ["EEDL", "EPDL", "EADL"]
+
+    # -- mcdc ----------------------------------------------------------
+
+    def test_mcdc_electron_only(self, data_dir, mcdc_calls) -> None:
+        """``mcdc --libraries electron`` must combine ONLY electron data."""
+        rc = cli.main(
+            ["mcdc", "--libraries", "electron", "--data-dir", str(data_dir),
+             "--z-min", "1", "--z-max", "1"]
+        )
+        assert rc == 0
+        assert mcdc_calls == [{"Z": 1, "eedl": True, "epdl": False, "eadl": False}]
+
+    def test_mcdc_photon_atomic(self, data_dir, mcdc_calls) -> None:
+        rc = cli.main(
+            ["mcdc", "--libraries", "photon", "atomic", "--data-dir", str(data_dir),
+             "--z-min", "1", "--z-max", "1"]
+        )
+        assert rc == 0
+        assert mcdc_calls == [{"Z": 1, "eedl": False, "epdl": True, "eadl": True}]
+
+    def test_mcdc_default_all_three(self, data_dir, mcdc_calls) -> None:
+        """With no ``--libraries`` all available libraries are combined."""
+        rc = cli.main(
+            ["mcdc", "--data-dir", str(data_dir), "--z-min", "1", "--z-max", "1"]
+        )
+        assert rc == 0
+        assert mcdc_calls == [{"Z": 1, "eedl": True, "epdl": True, "eadl": True}]
+
+    # -- all (selection must survive both stages) ----------------------
+
+    def test_all_electron_only_both_stages(
+        self, data_dir, raw_calls, mcdc_calls
+    ) -> None:
+        """``all --libraries electron`` must restrict BOTH raw and mcdc."""
+        rc = cli.main(
+            ["all", "--libraries", "electron", "--data-dir", str(data_dir),
+             "--z-min", "1", "--z-max", "1"]
+        )
+        assert rc == 0
+        assert raw_calls == ["EEDL"]
+        assert mcdc_calls == [{"Z": 1, "eedl": True, "epdl": False, "eadl": False}]

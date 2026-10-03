@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -----------------------------------------------------------------------------
-# Copyright (c) 2026 Melek Derman
+# Copyright (c) 2026 CARRE
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
@@ -49,7 +49,7 @@ Examples
 from __future__ import annotations
 
 __version__ = "1.0.0"
-__author__ = "Melek Derman"
+__author__ = "Melek Derman, Todd S. Palmer"
 
 from pyepics.client import ElementProperties, EPICSClient
 from pyepics.converters.hdf5 import (

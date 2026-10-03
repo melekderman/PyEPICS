@@ -7,8 +7,8 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 
 project = "PyEPICS"
-copyright = "2026, Melek Derman"
-author = "Melek Derman"
+copyright = "2026, CARRE"
+author = "Melek Derman, Todd S. Palmer"
 release = "1.0.0"
 
 extensions = [

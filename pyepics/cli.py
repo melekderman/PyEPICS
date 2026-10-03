@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -----------------------------------------------------------------------------
-# Copyright (c) 2026 Melek Derman
+# Copyright (c) 2026 CARRE
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # -----------------------------------------------------------------------------
@@ -205,6 +205,11 @@ def cmd_mcdc(args):
     base = Path(args.data_dir)
     z_min, z_max = args.z_min, args.z_max
 
+    # Honor the ``--libraries`` selection: only the requested libraries
+    # are included in the combined file.  With no selection, all three
+    # are included (default behavior).
+    selected = set(args.libraries or LIBRARY_CONFIG.keys())
+
     mcdc_dir = base / "data/mcdc"
     mcdc_dir.mkdir(parents=True, exist_ok=True)
 
@@ -224,9 +229,15 @@ def cmd_mcdc(args):
 
     for Z in range(z_min, z_max + 1):
         sym = _element_symbol(Z)
-        eedl_file = _find_endf_file(eedl_dir, "EEDL", Z)
-        epdl_file = _find_endf_file(epdl_dir, "EPDL", Z)
-        eadl_file = _find_endf_file(eadl_dir, "EADL", Z)
+        eedl_file = (
+            _find_endf_file(eedl_dir, "EEDL", Z) if "electron" in selected else None
+        )
+        epdl_file = (
+            _find_endf_file(epdl_dir, "EPDL", Z) if "photon" in selected else None
+        )
+        eadl_file = (
+            _find_endf_file(eadl_dir, "EADL", Z) if "atomic" in selected else None
+        )
 
         if not any([eedl_file, epdl_file, eadl_file]):
             continue
