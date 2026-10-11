@@ -23,7 +23,6 @@ from pyepics.client import (
     ElementProperties,
     _resolve_element,
 )
-from pyepics.exceptions import ValidationError
 from pyepics.models.records import (
     AverageEnergyLoss,
     CrossSectionRecord,
@@ -170,23 +169,23 @@ class TestResolveElement:
         assert z == 118 and sym == "Og"
 
     def test_invalid_z_zero(self):
-        with pytest.raises(ValidationError, match="outside the valid range"):
+        with pytest.raises(ValueError, match="outside the valid range"):
             _resolve_element(0)
 
     def test_invalid_z_negative(self):
-        with pytest.raises(ValidationError, match="outside the valid range"):
+        with pytest.raises(ValueError, match="outside the valid range"):
             _resolve_element(-1)
 
     def test_invalid_z_over_118(self):
-        with pytest.raises(ValidationError, match="outside the valid range"):
+        with pytest.raises(ValueError, match="outside the valid range"):
             _resolve_element(119)
 
     def test_invalid_string(self):
-        with pytest.raises(ValidationError, match="Unknown element"):
+        with pytest.raises(ValueError, match="Unknown element"):
             _resolve_element("Unobtanium")
 
     def test_invalid_type(self):
-        with pytest.raises(ValidationError, match="int or str"):
+        with pytest.raises(TypeError, match="int or str"):
             _resolve_element(3.14)  # type: ignore
 
     def test_numpy_integer(self):
@@ -354,7 +353,7 @@ class TestEPICSClient:
             mock_client.get_cross_section("Fe", "xs_nonexistent")
 
     def test_get_cross_section_bad_library(self, mock_client):
-        with pytest.raises(ValidationError, match="not"):
+        with pytest.raises(ValueError, match="not"):
             mock_client.get_cross_section("Fe", "xs_tot", library="EADL")
 
     def test_clear_cache(self, mock_client):
@@ -363,7 +362,7 @@ class TestEPICSClient:
         assert len(mock_client._cache) == 0
 
     def test_invalid_element(self, mock_client):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             mock_client.get_element("Unobtanium")
 
     def test_available_elements_no_dir(self, tmp_path):

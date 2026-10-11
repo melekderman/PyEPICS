@@ -6,71 +6,170 @@
 # -----------------------------------------------------------------------------
 
 """
-Tests for EPDL reader
+Tests for :class:`pyepics.readers.epdl.EPDLReader`
 
-Covers photon cross-section extraction, form factor parsing,
-and validation.
+Exercises the reader against the LLNL EPICS 2025 ``EPDL.ZA026000`` (Fe)
+fixture and asserts on the resulting
+:class:`~pyepics.models.records.EPDLDataset` contents.
+
+Assertions intentionally inspect only the public dataset surface (no
+``endf`` library internals) so the suite acts as a safety net for the
+later native-parser migration (Phase 2).
+
+The fixture is not committed; see ``tests/fixtures/README.md``.
+
+Coverage
+--------
+* Missing files and unrecognised filenames raise.
+* MF=23 cross sections populate ``cross_sections`` with non-empty,
+  non-negative, monotonically increasing energy grids.
+* MF=27 form factors and scattering functions populate ``form_factors``
+  with the four expected keys, with reference values matching the
+  underlying ENDF tabulation.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import numpy as np
 import pytest
 
-from pyepics.exceptions import FileFormatError
 from pyepics.models.records import EPDLDataset
+from pyepics.readers.epdl import EPDLReader
+
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "endf" / "EPDL.ZA026000.endf"
 
 
-class TestEPDLDataset:
-    """Tests using the sample_epdl_dataset fixture"""
+@pytest.fixture(scope="module")
+def epdl_fe_dataset() -> EPDLDataset:
+    """Parsed EPDL dataset for Iron (Z=26) from the ENDF fixture"""
+    if not FIXTURE_PATH.is_file():
+        pytest.skip(f"Fixture not found: {FIXTURE_PATH}")
+    reader = EPDLReader()
+    return reader.read(FIXTURE_PATH)
 
-    def test_atomic_number(self, sample_epdl_dataset: EPDLDataset) -> None:
-        assert sample_epdl_dataset.Z == 1
 
-    def test_symbol(self, sample_epdl_dataset: EPDLDataset) -> None:
-        assert sample_epdl_dataset.symbol == "H"
+class TestEPDLRealParseMetadata:
+    """Top-level metadata extracted from EPDL Fe (Z=26)"""
 
-    def test_total_xs_exists(self, sample_epdl_dataset: EPDLDataset) -> None:
-        assert "xs_tot" in sample_epdl_dataset.cross_sections
+    def test_atomic_number(self, epdl_fe_dataset: EPDLDataset) -> None:
+        assert epdl_fe_dataset.Z == 26
 
-    def test_coherent_xs_exists(self, sample_epdl_dataset: EPDLDataset) -> None:
-        assert "xs_coherent" in sample_epdl_dataset.cross_sections
+    def test_symbol(self, epdl_fe_dataset: EPDLDataset) -> None:
+        assert epdl_fe_dataset.symbol == "Fe"
 
-    def test_incoherent_xs_exists(self, sample_epdl_dataset: EPDLDataset) -> None:
-        assert "xs_incoherent" in sample_epdl_dataset.cross_sections
+    def test_atomic_weight_ratio(self, epdl_fe_dataset: EPDLDataset) -> None:
+        assert epdl_fe_dataset.atomic_weight_ratio == pytest.approx(55.3673, rel=1e-4)
 
-    def test_form_factor_coherent(self, sample_epdl_dataset: EPDLDataset) -> None:
-        assert "ff_coherent" in sample_epdl_dataset.form_factors
-        ff = sample_epdl_dataset.form_factors["ff_coherent"]
-        assert ff.x.shape == (4,)
-        assert ff.y.shape == (4,)
+    def test_za_identifier(self, epdl_fe_dataset: EPDLDataset) -> None:
+        assert epdl_fe_dataset.ZA == pytest.approx(26000.0)
 
-    def test_scattering_function(self, sample_epdl_dataset: EPDLDataset) -> None:
-        assert "sf_incoherent" in sample_epdl_dataset.form_factors
 
-    def test_cross_section_values_positive(
-        self, sample_epdl_dataset: EPDLDataset
+class TestEPDLRealParseCrossSections:
+    """MF=23 cross sections — sanity checks (parser already worked here)"""
+
+    def test_total_xs_present(self, epdl_fe_dataset: EPDLDataset) -> None:
+        assert "xs_tot" in epdl_fe_dataset.cross_sections
+
+    def test_coherent_xs_present(self, epdl_fe_dataset: EPDLDataset) -> None:
+        assert "xs_coherent" in epdl_fe_dataset.cross_sections
+
+    def test_xs_arrays_aligned(self, epdl_fe_dataset: EPDLDataset) -> None:
+        for label, rec in epdl_fe_dataset.cross_sections.items():
+            assert (
+                rec.energy.shape == rec.cross_section.shape
+            ), f"{label}: energy / xs shape mismatch"
+            assert rec.energy.size > 0, f"{label}: empty energy grid"
+
+    def test_xs_values_non_negative(self, epdl_fe_dataset: EPDLDataset) -> None:
+        for label, rec in epdl_fe_dataset.cross_sections.items():
+            assert np.all(rec.cross_section >= 0), f"{label} has negative values"
+
+
+class TestEPDLRealParseFormFactors:
+    """MF=27 form factors and scattering functions
+
+    These tests pin down the Bug 1 fix: ``EPDLReader`` must use the
+    ``endf`` key ``'H'`` for MF=27 sections (the package returns
+    tabulated data under ``H`` for MF=27 and ``sigma`` for MF=23).
+    """
+
+    expected_labels = ("ff_coherent", "sf_incoherent", "asf_imag", "asf_real")
+
+    def test_form_factors_populated(self, epdl_fe_dataset: EPDLDataset) -> None:
+        assert epdl_fe_dataset.form_factors, "form_factors must not be empty"
+
+    @pytest.mark.parametrize("label", expected_labels)
+    def test_expected_label_present(
+        self,
+        epdl_fe_dataset: EPDLDataset,
+        label: str,
     ) -> None:
-        import numpy as np
+        assert label in epdl_fe_dataset.form_factors, (
+            f"{label!r} missing from form_factors "
+            f"(have: {sorted(epdl_fe_dataset.form_factors)})"
+        )
 
-        for key, rec in sample_epdl_dataset.cross_sections.items():
-            assert np.all(rec.cross_section >= 0), f"{key} has negative values"
+    @pytest.mark.parametrize("label", expected_labels)
+    def test_arrays_aligned_and_non_empty(
+        self,
+        epdl_fe_dataset: EPDLDataset,
+        label: str,
+    ) -> None:
+        rec = epdl_fe_dataset.form_factors[label]
+        assert rec.x.size > 0, f"{label}: empty x array"
+        assert rec.x.shape == rec.y.shape, f"{label}: x / y shape mismatch"
+
+    def test_ff_coherent_reference_values(
+        self,
+        epdl_fe_dataset: EPDLDataset,
+    ) -> None:
+        """Coherent form factor F(x=0) equals Z (=26) for Fe"""
+        ff = epdl_fe_dataset.form_factors["ff_coherent"]
+        assert ff.x.size == 1166
+        assert ff.x[0] == pytest.approx(0.0)
+        assert ff.y[0] == pytest.approx(26.0)
+        assert ff.x[-1] == pytest.approx(1.0e9)
+
+    def test_sf_incoherent_reference_values(
+        self,
+        epdl_fe_dataset: EPDLDataset,
+    ) -> None:
+        """Incoherent scattering function S(x=0)=0 and S(∞)=Z=26 for Fe"""
+        sf = epdl_fe_dataset.form_factors["sf_incoherent"]
+        assert sf.x.size == 441
+        assert sf.y[0] == pytest.approx(0.0)
+        assert sf.y[-1] == pytest.approx(26.0)
+
+    def test_asf_real_reference_values(
+        self,
+        epdl_fe_dataset: EPDLDataset,
+    ) -> None:
+        """Real anomalous scattering factor — first y value matches LLNL data"""
+        asf = epdl_fe_dataset.form_factors["asf_real"]
+        assert asf.x.size == 361
+        assert asf.y[0] == pytest.approx(-26.0059225, rel=1e-6)
+
+    def test_asf_imag_reference_size(
+        self,
+        epdl_fe_dataset: EPDLDataset,
+    ) -> None:
+        asf = epdl_fe_dataset.form_factors["asf_imag"]
+        assert asf.x.size == 361
 
 
 class TestEPDLReader:
     """Tests for EPDL reader error paths"""
 
     def test_file_not_found(self, tmp_path) -> None:
-        from pyepics.readers.epdl import EPDLReader
-
         reader = EPDLReader()
-        with pytest.raises(FileFormatError):
+        with pytest.raises(FileNotFoundError):
             reader.read(tmp_path / "nonexistent.endf")
 
     def test_bad_filename(self, tmp_path) -> None:
-        from pyepics.readers.epdl import EPDLReader
-
         bad_file = tmp_path / "wrong_name.dat"
         bad_file.write_text("dummy")
         reader = EPDLReader()
-        with pytest.raises(FileFormatError):
+        with pytest.raises(ValueError):
             reader.read(bad_file)

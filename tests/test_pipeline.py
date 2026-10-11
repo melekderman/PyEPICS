@@ -136,23 +136,32 @@ class TestMcdcEEDL:
         with h5py.File(str(out), "r") as h5f:
             er = "electron_reactions"
             assert f"{er}/total/xs" in h5f
-            assert f"{er}/elastic_scattering/xs" in h5f
-            assert f"{er}/elastic_scattering/large_angle/xs" in h5f
+            for reaction, mt in (
+                ("elastic_scattering", 526),
+                ("bremsstrahlung", 527),
+                ("excitation", 528),
+                ("ionization", 522),
+            ):
+                grp = h5f[f"{er}/{reaction}/MT{mt}"]
+                assert grp.attrs["MT"] == mt
+                assert "xs" in grp
+                assert grp["reference_frame"][()] == b"LAB"
+            assert f"{er}/elastic_scattering/MT526/large_angle/xs" in h5f
             assert f"{er}/elastic_scattering/small_angle/xs" in h5f
-            assert f"{er}/bremsstrahlung/xs" in h5f
-            assert f"{er}/excitation/xs" in h5f
-            assert f"{er}/ionization/xs" in h5f
 
     def test_large_angle_scattering_cosine(self, tmp_path, sample_eedl_dataset):
         out = tmp_path / "mcdc_eedl.h5"
         with h5py.File(str(out), "w") as h5f:
             write_mcdc_eedl(h5f, sample_eedl_dataset)
         with h5py.File(str(out), "r") as h5f:
-            sc = "electron_reactions/elastic_scattering/large_angle/scattering_cosine"
+            sc = (
+                "electron_reactions/elastic_scattering/MT526/"
+                "large_angle/scattering_cosine"
+            )
             assert f"{sc}/energy_grid" in h5f
             assert f"{sc}/energy_offset" in h5f
             assert f"{sc}/value" in h5f
-            assert f"{sc}/PDF" in h5f
+            assert h5f[f"{sc}/CDF"].shape == h5f[f"{sc}/value"].shape
 
 
 # -----------------------------------------------------------------------

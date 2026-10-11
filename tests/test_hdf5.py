@@ -14,6 +14,8 @@ attribute values, and error conditions for all three dataset types.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -23,7 +25,6 @@ except ImportError:
     pytest.skip("h5py not installed", allow_module_level=True)
 
 from pyepics.converters.hdf5 import convert_dataset_to_hdf5
-from pyepics.exceptions import ConversionError
 from pyepics.models.records import EADLDataset, EEDLDataset, EPDLDataset
 
 # -----------------------------------------------------------------------
@@ -219,6 +220,32 @@ class TestWriteEADL:
 
 
 # -----------------------------------------------------------------------
+# End-to-end conversion from ENDF fixtures
+# -----------------------------------------------------------------------
+
+ENDF_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "endf"
+
+
+class TestConvertFromENDF:
+    """convert_dataset_to_hdf5 dispatches to the matching reader"""
+
+    @pytest.mark.parametrize("dataset_type", ["EEDL", "EPDL", "EADL"])
+    def test_writes_library_group(self, tmp_path, dataset_type: str) -> None:
+        src = ENDF_FIXTURE_DIR / f"{dataset_type}.ZA026000.endf"
+        if not src.is_file():
+            pytest.skip(f"Fixture not found: {src}")
+
+        out = tmp_path / f"{dataset_type}.h5"
+        convert_dataset_to_hdf5(dataset_type, src, out)
+
+        with h5py.File(out, "r") as h5f:
+            assert set(h5f.keys()) == {"metadata", dataset_type}
+            assert list(h5f[dataset_type].keys()) == ["Z_026"]
+            assert h5f["metadata/Z"][()] == 26
+            assert h5f["metadata/symbol"][()] == b"Fe"
+
+
+# -----------------------------------------------------------------------
 # Error conditions
 # -----------------------------------------------------------------------
 
@@ -233,5 +260,5 @@ class TestConvertErrors:
     def test_overwrite_false_existing_file(self, tmp_path) -> None:
         out = tmp_path / "existing.h5"
         out.touch()
-        with pytest.raises(ConversionError, match="already exists"):
+        with pytest.raises(FileExistsError, match="already exists"):
             convert_dataset_to_hdf5("EEDL", "src.endf", out, overwrite=False)
