@@ -8,9 +8,10 @@
 """
 Tests for the GFP elastic data written to MC/DC files (mcdc_gfp)
 
-The April 2026 MC/DC Fe file (see tests/fixtures/README.md) remains the
-reference for unchanged behavior.  Corrected screened Rutherford moments
-are checked against independent quadrature that resolves the forward peak.
+The April 2026 MC/DC Fe file is an optional local reference, not distributed
+with the project (see tests/fixtures/README.md).  Mandatory synthetic tests
+cover the output schema, model fitting, and screened Rutherford moments
+against independent quadrature that resolves the forward peak.
 """
 
 from __future__ import annotations
@@ -46,8 +47,40 @@ APRIL_NAMES = {"gfp2": "gfp2", "dk_fp": "delta_kernel_fp", "gfp3": "gfp3"}
 
 @pytest.fixture(scope="module")
 def april():
-    with np.load(APRIL_FE) as z:
+    try:
+        archive = np.load(APRIL_FE)
+    except FileNotFoundError:
+        pytest.skip(f"Optional local April GFP reference is absent (not distributed): {APRIL_FE}")
+    with archive as z:
         return {k: z[k] for k in z.files}
+
+
+def test_april_reference_missing(tmp_path, monkeypatch):
+    monkeypatch.setitem(globals(), "APRIL_FE", tmp_path / "missing.npz")
+    with pytest.raises(pytest.skip.Exception, match="Optional local April GFP reference is absent"):
+        april.__wrapped__()
+
+
+def test_april_reference_corrupt(tmp_path, monkeypatch):
+    path = tmp_path / "corrupt.npz"
+    path.write_bytes(b"not a NumPy archive")
+    monkeypatch.setitem(globals(), "APRIL_FE", path)
+    with pytest.raises(ValueError):
+        april.__wrapped__()
+
+
+def test_april_reference_unreadable(tmp_path, monkeypatch):
+    path = tmp_path / "unreadable.npz"
+    path.touch()
+    monkeypatch.setitem(globals(), "APRIL_FE", path)
+
+    def denied(filename):
+        assert filename == path
+        raise PermissionError("reference read denied")
+
+    monkeypatch.setattr(np, "load", denied)
+    with pytest.raises(PermissionError, match="reference read denied"):
+        april.__wrapped__()
 
 
 def _april_sigma(april):
@@ -74,7 +107,69 @@ def test_parameters_match_april(april):
 
 
 # -----------------------------------------------------------------------
-# Full chain on the Fe EEDL fixture
+# Mandatory synthetic output schema
+# -----------------------------------------------------------------------
+
+
+def test_synthetic_model_output_schema(tmp_path, sample_eedl_dataset):
+    """Schema expectations come from the writer contract, not reference data."""
+    float_arrays = {
+        "gfp2": (
+            "energy_grid Sigma_s0 Sigma_s1 Sigma_s2 Sigma_s3 alpha beta beta_raw "
+            "Sigma_delta0 transition_rate Sigma_tr mu_star_optimal mu_star_optimal_raw"
+        ).split(),
+        "dk_fp": "energy_grid Sigma_tr Sigma_delta0 mu_star mu_star_raw".split(),
+        "gfp3": (
+            "energy_grid Sigma_s0 Sigma_s1 Sigma_s2 Sigma_s3 alpha beta1 beta2 "
+            "Sigma_delta0 transition_rate_02 transition_rate_21"
+        ).split(),
+    }
+    scalars = {"gfp2": {"mu_star": 0.9, "beta_max": 100.0}, "dk_fp": {},
+               "gfp3": {"mu_star": 0.9}}
+    grid = sample_eedl_dataset.cross_sections["xs_tot"].energy
+    out = tmp_path / "synthetic.h5"
+    with h5py.File(out, "w") as h5f:
+        write_mcdc_eedl(h5f, sample_eedl_dataset)
+    with h5py.File(out, "r") as h5f:
+        root = h5f["electron_reactions"]
+        assert root["xs_energy_grid"].attrs["unit"] == "eV"
+        assert root["elastic_scattering/MT526/xs"].attrs["unit"] == "barns"
+        models = root["elastic_scattering/small_angle/models"]
+        assert set(models) == set(GROUPS)
+        for group in GROUPS:
+            data = models[group]
+            dtypes = {key: "f8" for key in float_arrays[group]}
+            dtypes.update(success="bool", warning="S256")
+            if group == "gfp2":
+                dtypes.update(regime="S12", mu_star_optimal_success="bool",
+                              mu_star_optimal_warning="S256")
+            assert set(data) == set(dtypes) | set(scalars[group])
+            for key, dtype in dtypes.items():
+                assert data[key].shape == grid.shape, f"{group}/{key}"
+                assert data[key].dtype == np.dtype(dtype), f"{group}/{key}"
+                assert dict(data[key].attrs) == {}
+            for key, value in scalars[group].items():
+                assert data[key].shape == () and data[key].dtype == np.dtype("f8")
+                assert data[key][()] == value
+                assert dict(data[key].attrs) == {}
+            np.testing.assert_array_equal(data["energy_grid"][()], grid)
+            expected_attrs = (
+                {"dcs_source": "eedl", "mu_grid_policy": "native", "n_angular_anchors": 26}
+                if group == "gfp2" else {}
+            )
+            assert dict(data.attrs) == expected_attrs
+        np.testing.assert_array_equal(
+            models["gfp2/Sigma_s0"][()],
+            sample_eedl_dataset.cross_sections["xs_el"].cross_section,
+        )
+        for l in range(4):
+            np.testing.assert_array_equal(
+                models[f"gfp2/Sigma_s{l}"][()], models[f"gfp3/Sigma_s{l}"][()]
+            )
+
+
+# -----------------------------------------------------------------------
+# Full chain on the Fe EEDL fixture (April comparisons are optional)
 # -----------------------------------------------------------------------
 
 
@@ -420,7 +515,7 @@ def test_elastic_moments_mixing():
     )
     np.testing.assert_array_equal(sigma[0], 0.0)
     np.testing.assert_allclose(sigma[1], 4.0 * np.array([1.0, 0.3, 0.2, 0.1]))
-    g_sa = legendre_moments_screened_rutherford(float(small_angle_eta(26, [1.5e3])[0]))
+    g_sa = _reference_sr_moments(float(small_angle_eta(26, [1.5e3])[0]))
     np.testing.assert_allclose(
         sigma[2], 2.0 * np.array([1.0, 0.3, 0.2, 0.1]) + 2.0 * g_sa
     )

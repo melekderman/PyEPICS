@@ -6,6 +6,9 @@ __pycache__/
 # Data directory (downloaded ENDF, generated HDF5)
 data/
 
+# Optional local reference data; not authorized for distribution.
+tests/fixtures/april_gfp_Fe.npz
+
 # Generated reports
 tests/reports/
 
