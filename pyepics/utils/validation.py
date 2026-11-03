@@ -126,6 +126,52 @@ def validate_energy_monotonic(energy: np.ndarray, label: str = "energy") -> None
     logger.debug("Array '%s' (%d points) passed monotonicity check.", label, arr.size)
 
 
+def validate_strictly_descending(values: np.ndarray, label: str = "values") -> None:
+    """Verify that an array is strictly descending
+
+    Parameters
+    ----------
+    values : numpy.ndarray
+        1-D array of values (e.g. group boundaries in eV).
+    label : str, optional
+        Human-readable name of the array for error messages.
+
+    Raises
+    ------
+    ValidationError
+        If any ``values[i] <= values[i+1]``.  If the array is strictly
+        ascending, the message says so, since that usually means the
+        high-to-low convention was swapped.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> validate_strictly_descending(np.array([3.0, 2.0, 1.0]))
+    >>> validate_strictly_descending(np.array([1.0, 2.0]))  # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+        ...
+    pyepics.exceptions.ValidationError: ...
+    """
+    arr = np.asarray(values, dtype="f8")
+    if arr.size < 2:
+        return
+    diff = np.diff(arr)
+    if np.all(diff < 0):
+        logger.debug("Array '%s' (%d points) passed descending check.", label, arr.size)
+        return
+    if np.all(diff > 0):
+        raise ValidationError(
+            f"Array '{label}' is strictly ascending but must be strictly "
+            f"descending (first={arr[0]:.6e}, last={arr[-1]:.6e})."
+        )
+    first_bad = int(np.argmax(diff >= 0))
+    raise ValidationError(
+        f"Array '{label}' is not strictly descending.  "
+        f"First violation at index {first_bad}: "
+        f"{arr[first_bad]:.6e} <= {arr[first_bad + 1]:.6e}."
+    )
+
+
 def validate_non_negative(values: np.ndarray, label: str = "values") -> None:
     """Verify that all values in the array are non-negative
 
