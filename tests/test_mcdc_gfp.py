@@ -132,8 +132,8 @@ def test_synthetic_model_output_schema(tmp_path, sample_eedl_dataset):
         write_mcdc_eedl(h5f, sample_eedl_dataset)
     with h5py.File(out, "r") as h5f:
         root = h5f["electron_reactions"]
-        assert root["xs_energy_grid"].attrs["unit"] == "eV"
-        assert root["elastic_scattering/MT526/xs"].attrs["unit"] == "barns"
+        assert root["xs_energy_grid"].attrs["units"] == "eV"
+        assert root["elastic_scattering/MT526/xs"].attrs["units"] == "barns"
         models = root["elastic_scattering/small_angle/models"]
         assert set(models) == set(GROUPS)
         for group in GROUPS:
