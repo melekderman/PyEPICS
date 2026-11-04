@@ -149,6 +149,20 @@ class TestMcdcEEDL:
             assert f"{er}/elastic_scattering/MT526/large_angle/xs" in h5f
             assert f"{er}/elastic_scattering/small_angle/xs" in h5f
 
+    def test_without_angular_distribution(self, tmp_path, sample_eedl_dataset):
+        sample_eedl_dataset.distributions.pop("ang_lge")
+        out = tmp_path / "mcdc_eedl.h5"
+        with h5py.File(str(out), "w") as h5f:
+            write_mcdc_eedl(h5f, sample_eedl_dataset)
+        with h5py.File(str(out), "r") as h5f:
+            elastic = h5f["electron_reactions/elastic_scattering"]
+            np.testing.assert_array_equal(
+                elastic["MT526/xs"][()],
+                sample_eedl_dataset.cross_sections["xs_el"].cross_section,
+            )
+            assert "small_angle/scattering_cosine/CDF" in elastic
+            assert "small_angle/models" not in elastic
+
     def test_large_angle_scattering_cosine(self, tmp_path, sample_eedl_dataset):
         out = tmp_path / "mcdc_eedl.h5"
         with h5py.File(str(out), "w") as h5f:

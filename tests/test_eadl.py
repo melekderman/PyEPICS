@@ -38,6 +38,7 @@ import pytest
 
 from pyepics.models.records import EADLDataset
 from pyepics.readers.eadl import EADLReader
+from pyepics.exceptions import FileFormatError
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "endf" / "EADL.ZA026000.endf"
 
@@ -183,12 +184,12 @@ class TestEADLReader:
 
     def test_file_not_found(self, tmp_path) -> None:
         reader = EADLReader()
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(FileFormatError):
             reader.read(tmp_path / "nonexistent.endf")
 
     def test_bad_filename(self, tmp_path) -> None:
         bad_file = tmp_path / "no_za_pattern.txt"
         bad_file.write_text("dummy")
         reader = EADLReader()
-        with pytest.raises(ValueError):
+        with pytest.raises(FileFormatError):
             reader.read(bad_file)

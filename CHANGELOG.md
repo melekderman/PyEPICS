@@ -2,6 +2,36 @@
 
 All notable changes to PyEPICS are documented in this file.
 
+## Upcoming
+
+### Added
+
+- Real ENDF parser tests and synthetic GFP regression tests.
+  — [@melekderman](https://github.com/melekderman)
+- GFP2, delta-kernel FP model calculations for MC/DC.
+  — [@melekderman](https://github.com/melekderman)
+
+### Changed
+
+- CI runs tests, builds, lint, formatting and docs checks on `dev`/`main` PRs and pushes.
+  — [@melekderman](https://github.com/melekderman)
+- MC/DC electron HDF5 output uses MT reaction groups and normalized CDFs.
+  — [@melekderman](https://github.com/melekderman)
+
+### Fixed
+
+- Missing GFP model datasets in MC/DC HDF5 output.
+  — [@melekderman](https://github.com/melekderman)
+- Incorrect exception types expected by unit tests
+  ([#12](https://github.com/melekderman/PyEPICS/pull/12)).
+  — [@hansenkyle](https://github.com/hansenkyle)
+- Screened Rutherford moments for small screening parameters.
+  — [@melekderman](https://github.com/melekderman)
+- CLI option parsing and `--libraries` selection.
+  — [@melekderman](https://github.com/melekderman)
+- EPDL form-factor and EADL atomic-transition parsing.
+  — [@melekderman](https://github.com/melekderman)
+
 ## [1.0.0] — 2026-02-15
 
 ### Added

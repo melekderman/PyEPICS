@@ -81,7 +81,7 @@ def _insert_log_log_tables(energy, offset, value, pdf):
         for i in range(len(energy))
     ]
     out = []
-    for (e0, mu0, p0), (e1, mu1, p1) in zip(tables[:-1], tables[1:]):
+    for (e0, mu0, p0), (e1, mu1, p1) in zip(tables[:-1], tables[1:], strict=True):
         out.append((e0, mu0, p0))
         ratio = e1 / e0
         if ratio <= ANCHOR_MAX_ENERGY_RATIO:
@@ -153,12 +153,15 @@ def legendre_moments_screened_rutherford(eta):
         m1 = eta * ((1.0 + 0.5 * eta) * L - 1.0)
         m2 = 2.0 * eta * (1.0 - m1)
         m3 = 2.0 * eta - 1.5 * eta * m2
-        return np.array([
-            1.0,
-            1.0 - m1,
-            1.0 - 3.0 * m1 + 1.5 * m2,
-            1.0 - 6.0 * m1 + 7.5 * m2 - 2.5 * m3,
-        ], dtype="f8")
+        return np.array(
+            [
+                1.0,
+                1.0 - m1,
+                1.0 - 3.0 * m1 + 1.5 * m2,
+                1.0 - 6.0 * m1 + 7.5 * m2 - 2.5 * m3,
+            ],
+            dtype="f8",
+        )
     nodes, weights = _sr_quadrature()
     pdf = (1.0 / (eta + 1.0 - nodes) ** 2) / (2.0 / (eta * (eta + 2.0)))
     g = _NO_DEFLECTION.copy()
@@ -482,7 +485,7 @@ def gfp_parameters(sigma, mu_star=GFP_MU_STAR, beta_max=GFP2_BETA_MAX):
             gfp3.append(gfp3_params(s[0], s[1], s[2], s[3], mu_star))
         keys = ("mu_star_optimal", "mu_star_optimal_raw", "mu_star_optimal_success")
         mu_opt = optimal_mu_star_gfp2(row2["alpha"], row2["beta"], s[0] - s[3])
-        row2.update(zip(keys + ("mu_star_optimal_warning",), mu_opt))
+        row2.update(zip(keys + ("mu_star_optimal_warning",), mu_opt, strict=True))
         gfp2.append(row2)
     return {
         "gfp2": _columns(gfp2),
@@ -536,12 +539,15 @@ def build_gfp_data(
     )
     ends = list(offset[1:]) + [len(mu)]
     anchor_g = np.array(
-        [legendre_moments_tabulated(mu[a:b], pdf[a:b]) for a, b in zip(offset, ends)]
+        [
+            legendre_moments_tabulated(mu[a:b], pdf[a:b])
+            for a, b in zip(offset, ends, strict=True)
+        ]
     )
     sigma = elastic_moments(Z, energy, xs_el, xs_la, anchor_energy, anchor_g)
     params = gfp_parameters(sigma, mu_star, beta_max)
 
-    moments = {f"Sigma_s{l}": sigma[:, l].copy() for l in range(4)}
+    moments = {f"Sigma_s{order}": sigma[:, order].copy() for order in range(4)}
     gfp2_attrs = {
         "dcs_source": "eedl",
         "mu_grid_policy": "native",

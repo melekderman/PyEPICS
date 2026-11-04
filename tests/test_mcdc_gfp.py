@@ -50,14 +50,18 @@ def april():
     try:
         archive = np.load(APRIL_FE)
     except FileNotFoundError:
-        pytest.skip(f"Optional local April GFP reference is absent (not distributed): {APRIL_FE}")
+        pytest.skip(
+            f"Optional local April GFP reference is absent (not distributed): {APRIL_FE}"
+        )
     with archive as z:
         return {k: z[k] for k in z.files}
 
 
 def test_april_reference_missing(tmp_path, monkeypatch):
     monkeypatch.setitem(globals(), "APRIL_FE", tmp_path / "missing.npz")
-    with pytest.raises(pytest.skip.Exception, match="Optional local April GFP reference is absent"):
+    with pytest.raises(
+        pytest.skip.Exception, match="Optional local April GFP reference is absent"
+    ):
         april.__wrapped__()
 
 
@@ -124,16 +128,19 @@ def test_synthetic_model_output_schema(tmp_path, sample_eedl_dataset):
             "Sigma_delta0 transition_rate_02 transition_rate_21"
         ).split(),
     }
-    scalars = {"gfp2": {"mu_star": 0.9, "beta_max": 100.0}, "dk_fp": {},
-               "gfp3": {"mu_star": 0.9}}
+    scalars = {
+        "gfp2": {"mu_star": 0.9, "beta_max": 100.0},
+        "dk_fp": {},
+        "gfp3": {"mu_star": 0.9},
+    }
     grid = sample_eedl_dataset.cross_sections["xs_tot"].energy
     out = tmp_path / "synthetic.h5"
     with h5py.File(out, "w") as h5f:
         write_mcdc_eedl(h5f, sample_eedl_dataset)
     with h5py.File(out, "r") as h5f:
         root = h5f["electron_reactions"]
-        assert root["xs_energy_grid"].attrs["unit"] == "eV"
-        assert root["elastic_scattering/MT526/xs"].attrs["unit"] == "barns"
+        assert root["xs_energy_grid"].attrs["units"] == "eV"
+        assert root["elastic_scattering/MT526/xs"].attrs["units"] == "barns"
         models = root["elastic_scattering/small_angle/models"]
         assert set(models) == set(GROUPS)
         for group in GROUPS:
@@ -141,8 +148,11 @@ def test_synthetic_model_output_schema(tmp_path, sample_eedl_dataset):
             dtypes = {key: "f8" for key in float_arrays[group]}
             dtypes.update(success="bool", warning="S256")
             if group == "gfp2":
-                dtypes.update(regime="S12", mu_star_optimal_success="bool",
-                              mu_star_optimal_warning="S256")
+                dtypes.update(
+                    regime="S12",
+                    mu_star_optimal_success="bool",
+                    mu_star_optimal_warning="S256",
+                )
             assert set(data) == set(dtypes) | set(scalars[group])
             for key, dtype in dtypes.items():
                 assert data[key].shape == grid.shape, f"{group}/{key}"
@@ -154,8 +164,13 @@ def test_synthetic_model_output_schema(tmp_path, sample_eedl_dataset):
                 assert dict(data[key].attrs) == {}
             np.testing.assert_array_equal(data["energy_grid"][()], grid)
             expected_attrs = (
-                {"dcs_source": "eedl", "mu_grid_policy": "native", "n_angular_anchors": 26}
-                if group == "gfp2" else {}
+                {
+                    "dcs_source": "eedl",
+                    "mu_grid_policy": "native",
+                    "n_angular_anchors": 26,
+                }
+                if group == "gfp2"
+                else {}
             )
             assert dict(data.attrs) == expected_attrs
         np.testing.assert_array_equal(
@@ -234,17 +249,22 @@ def fe_reference(fe_written):
     d = dataset.distributions["ang_lge"]
     energy, offset, mu, pdf = build_pdf(d.inc_energy, d.value, d.probability)
     ends = list(offset[1:]) + [len(mu)]
-    tables = _reference_log_log_tables([
-        (e, mu[a:b], pdf[a:b]) for e, a, b in zip(energy, offset, ends)
-    ])
-    anchor_g = np.array([
-        [_trapezoid(np.polynomial.legendre.legval(m, [0] * l + [1]) * p, m)
-         / _trapezoid(p, m) for l in range(4)]
-        for _, m, p in tables
-    ])
-    g_la = np.column_stack([
-        np.interp(grid, [t[0] for t in tables], anchor_g[:, l]) for l in range(4)
-    ])
+    tables = _reference_log_log_tables(
+        [(e, mu[a:b], pdf[a:b]) for e, a, b in zip(energy, offset, ends)]
+    )
+    anchor_g = np.array(
+        [
+            [
+                _trapezoid(np.polynomial.legendre.legval(m, [0] * l + [1]) * p, m)
+                / _trapezoid(p, m)
+                for l in range(4)
+            ]
+            for _, m, p in tables
+        ]
+    )
+    g_la = np.column_stack(
+        [np.interp(grid, [t[0] for t in tables], anchor_g[:, l]) for l in range(4)]
+    )
     xs_sa = np.maximum(xs_el - xs_la, 0.0)
     sigma = xs_la[:, None] * g_la
     for i in np.flatnonzero(xs_sa > 0.0):
@@ -289,8 +309,10 @@ def test_fe_values(fe_written, april, fe_reference):
     ):
         for key in keys:
             np.testing.assert_allclose(
-                data[key][unchanged], april[f"{group}/{key}"][unchanged],
-                rtol=1e-10, err_msg=key
+                data[key][unchanged],
+                april[f"{group}/{key}"][unchanged],
+                rtol=1e-10,
+                err_msg=key,
             )
 
 
@@ -323,7 +345,8 @@ def test_fe_corrected_moments_and_models(fe_written, fe_reference):
     check(6.0 * alpha / (1.0 + 6.0 * beta), a2)
     np.testing.assert_allclose(
         gfp2["Sigma_delta0"][corrected] * (1.0 - gfp2["mu_star"]),
-        2.0 * alpha, rtol=1e-10,
+        2.0 * alpha,
+        rtol=1e-10,
     )
     np.testing.assert_allclose(
         gfp2["transition_rate"][corrected] * beta, alpha, rtol=1e-10
@@ -467,10 +490,25 @@ def test_screened_rutherford_g1(eta):
     assert g[1] == pytest.approx(g1, rel=1e-12)
 
 
-@pytest.mark.parametrize("eta", [
-    5e-16, 5e-15, 1e-12, 1e-8, 1e-6, 1e-4, 1e-2,
-    np.nextafter(0.1, 0.0), 0.1, np.nextafter(0.1, 1.0), 1.0, 10.0, 100.0, 2200.0,
-])
+@pytest.mark.parametrize(
+    "eta",
+    [
+        5e-16,
+        5e-15,
+        1e-12,
+        1e-8,
+        1e-6,
+        1e-4,
+        1e-2,
+        np.nextafter(0.1, 0.0),
+        0.1,
+        np.nextafter(0.1, 1.0),
+        1.0,
+        10.0,
+        100.0,
+        2200.0,
+    ],
+)
 def test_screened_rutherford_independent_quadrature(eta):
     """Cover the 10 eV--100 GeV, Z=1--100 eta range and both branches."""
     reference = _reference_sr_moments(eta)
@@ -487,10 +525,12 @@ def test_screened_rutherford_independent_quadrature(eta):
 
 
 def test_screened_rutherford_forward_limit():
-    moments = np.array([
-        legendre_moments_screened_rutherford(eta)
-        for eta in (1e-2, 1e-4, 1e-6, 1e-8, 1e-12, 1e-16)
-    ])
+    moments = np.array(
+        [
+            legendre_moments_screened_rutherford(eta)
+            for eta in (1e-2, 1e-4, 1e-6, 1e-8, 1e-12, 1e-16)
+        ]
+    )
     assert np.all(np.diff(moments[:, 1:], axis=0) > 0.0)
     assert np.all(moments <= 1.0)
     np.testing.assert_allclose(moments[-1], 1.0, rtol=0.0, atol=3e-14)

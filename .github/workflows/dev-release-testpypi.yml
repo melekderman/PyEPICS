@@ -12,6 +12,7 @@ concurrency:
 jobs:
   dev-release-testpypi:
     name: Create dev release and publish to TestPyPI
+    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
 
     environment:

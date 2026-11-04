@@ -26,6 +26,7 @@ except ImportError:
 
 from pyepics.converters.hdf5 import convert_dataset_to_hdf5
 from pyepics.models.records import EADLDataset, EEDLDataset, EPDLDataset
+from pyepics.exceptions import ConversionError
 
 # -----------------------------------------------------------------------
 # Direct writer tests (using dataset fixtures)
@@ -260,5 +261,5 @@ class TestConvertErrors:
     def test_overwrite_false_existing_file(self, tmp_path) -> None:
         out = tmp_path / "existing.h5"
         out.touch()
-        with pytest.raises(FileExistsError, match="already exists"):
+        with pytest.raises(ConversionError, match="already exists"):
             convert_dataset_to_hdf5("EEDL", "src.endf", out, overwrite=False)

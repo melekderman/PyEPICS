@@ -51,6 +51,7 @@ except ImportError as _exc:
         "The 'h5py' package is required.  Install with: pip install h5py"
     ) from _exc
 
+from pyepics.converters.mcdc_gfp import build_gfp_data
 from pyepics.models.records import (
     EADLDataset,
     EEDLDataset,
@@ -144,7 +145,9 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     All cross sections are resampled onto the total-xs energy grid.
     Angular distributions are compressed into (grid, offset, value, PDF)
     tables.  Small-angle elastic scattering cosine PDFs are computed
-    analytically from screened Rutherford theory.
+    analytically from screened Rutherford theory.  When large-angle angular
+    tables are available, GFP2, delta-kernel FP and GFP3 model data are written
+    under ``elastic_scattering/small_angle/models``.
 
     Parameters
     ----------
@@ -237,6 +240,17 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
             "CDF", data=_multi_cdf_from_pdf(off_sa, val_sa, pdf_sa)
         )
 
+    if "ang_lge" in dist:
+        gfp_data = build_gfp_data(
+            Z, xs_energy_grid, xs_sc_total, xs_sc_la, eg, off, val, PDF
+        )
+        models_grp = sa_grp.create_group("models")
+        for name, (attrs, arrays) in gfp_data.items():
+            model_grp = models_grp.create_group(name)
+            model_grp.attrs.update(attrs)
+            for key, values in arrays.items():
+                model_grp.create_dataset(key, data=values)
+
     # --- Bremsstrahlung (MT527) ---
     brem_grp = root.create_group("bremsstrahlung")
     brem_mt = brem_grp.create_group("MT527")
@@ -265,7 +279,9 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     ion_grp = root.create_group("ionization")
     ion_mt = ion_grp.create_group("MT522")
     ion_mt.attrs["MT"] = np.int64(522)
-    _create_xs_dataset(ion_mt, "xs", xs_ion_total, "barns").attrs["offset"] = np.int64(0)
+    _create_xs_dataset(ion_mt, "xs", xs_ion_total, "barns").attrs["offset"] = np.int64(
+        0
+    )
     ion_mt.create_dataset("reference_frame", data=np.bytes_("LAB"))
     subs_grp = ion_mt.create_group("subshells")
 

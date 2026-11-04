@@ -40,6 +40,7 @@ from pyepics.utils.validation import (
     validate_cross_section,
     validate_probability_sum,
 )
+from pyepics.exceptions import ParseError, FileFormatError, ValidationError
 
 # -----------------------------------------------------------------------
 # float_endf / int_endf
@@ -67,8 +68,8 @@ class TestFloatEndf:
     def test_empty_string(self) -> None:
         assert float_endf("") == 0.0
 
-    def test_invalid_raises_value_error(self) -> None:
-        with pytest.raises(ValueError):
+    def test_invalid_raises_parse_error(self) -> None:
+        with pytest.raises(ParseError):
             float_endf("not_a_number")
 
     def test_zero(self) -> None:
@@ -252,7 +253,7 @@ class TestExtractAtomicNumber:
     def test_invalid_name(self, tmp_path) -> None:
         p = tmp_path / "random_file.txt"
         p.touch()
-        with pytest.raises(ValueError):
+        with pytest.raises(FileFormatError):
             extract_atomic_number_from_path(p)
 
 
@@ -269,29 +270,29 @@ class TestValidation:
         validate_atomic_number(118)
 
     def test_invalid_atomic_number_zero(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_atomic_number(0)
 
     def test_invalid_atomic_number_high(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_atomic_number(200)
 
     def test_monotonic_energy(self) -> None:
         validate_energy_monotonic(np.array([1.0, 2.0, 3.0]))
 
     def test_non_monotonic_energy(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_energy_monotonic(np.array([3.0, 1.0, 2.0]))
 
     def test_non_negative_pass(self) -> None:
         validate_non_negative(np.array([0.0, 1.0, 2.0]))
 
     def test_non_negative_fail(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_non_negative(np.array([1.0, -0.5, 2.0]))
 
     def test_cross_section_shape_mismatch(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_cross_section(
                 np.array([1.0, 2.0]),
                 np.array([1.0]),
@@ -301,7 +302,7 @@ class TestValidation:
         validate_probability_sum(np.array([0.3, 0.7]))
 
     def test_probability_sum_fail(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_probability_sum(np.array([0.1, 0.1]))
 
 
@@ -315,14 +316,14 @@ class TestEEDLReader:
 
     def test_file_not_found(self, tmp_path) -> None:
         reader = EEDLReader()
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(FileFormatError):
             reader.read(tmp_path / "nonexistent.endf")
 
     def test_bad_filename_pattern(self, tmp_path) -> None:
         bad_file = tmp_path / "bad_name.endf"
         bad_file.write_text("dummy content")
         reader = EEDLReader()
-        with pytest.raises(ValueError):
+        with pytest.raises(FileFormatError):
             reader.read(bad_file)
 
 

@@ -37,6 +37,7 @@ import pytest
 
 from pyepics.models.records import EPDLDataset
 from pyepics.readers.epdl import EPDLReader
+from pyepics.exceptions import FileFormatError
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "endf" / "EPDL.ZA026000.endf"
 
@@ -164,12 +165,12 @@ class TestEPDLReader:
 
     def test_file_not_found(self, tmp_path) -> None:
         reader = EPDLReader()
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(FileFormatError):
             reader.read(tmp_path / "nonexistent.endf")
 
     def test_bad_filename(self, tmp_path) -> None:
         bad_file = tmp_path / "wrong_name.dat"
         bad_file.write_text("dummy")
         reader = EPDLReader()
-        with pytest.raises(ValueError):
+        with pytest.raises(FileFormatError):
             reader.read(bad_file)
