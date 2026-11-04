@@ -153,12 +153,15 @@ def legendre_moments_screened_rutherford(eta):
         m1 = eta * ((1.0 + 0.5 * eta) * L - 1.0)
         m2 = 2.0 * eta * (1.0 - m1)
         m3 = 2.0 * eta - 1.5 * eta * m2
-        return np.array([
-            1.0,
-            1.0 - m1,
-            1.0 - 3.0 * m1 + 1.5 * m2,
-            1.0 - 6.0 * m1 + 7.5 * m2 - 2.5 * m3,
-        ], dtype="f8")
+        return np.array(
+            [
+                1.0,
+                1.0 - m1,
+                1.0 - 3.0 * m1 + 1.5 * m2,
+                1.0 - 6.0 * m1 + 7.5 * m2 - 2.5 * m3,
+            ],
+            dtype="f8",
+        )
     nodes, weights = _sr_quadrature()
     pdf = (1.0 / (eta + 1.0 - nodes) ** 2) / (2.0 / (eta * (eta + 2.0)))
     g = _NO_DEFLECTION.copy()

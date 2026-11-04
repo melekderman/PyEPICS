@@ -294,8 +294,17 @@ class TestLibrarySelectionBehavior:
 
     def test_raw_electron_only(self, data_dir, raw_calls) -> None:
         rc = cli.main(
-            ["raw", "--libraries", "electron", "--data-dir", str(data_dir),
-             "--z-min", "1", "--z-max", "1"]
+            [
+                "raw",
+                "--libraries",
+                "electron",
+                "--data-dir",
+                str(data_dir),
+                "--z-min",
+                "1",
+                "--z-max",
+                "1",
+            ]
         )
         assert rc == 0
         assert raw_calls == ["EEDL"]
@@ -312,16 +321,35 @@ class TestLibrarySelectionBehavior:
     def test_mcdc_electron_only(self, data_dir, mcdc_calls) -> None:
         """``mcdc --libraries electron`` must combine ONLY electron data."""
         rc = cli.main(
-            ["mcdc", "--libraries", "electron", "--data-dir", str(data_dir),
-             "--z-min", "1", "--z-max", "1"]
+            [
+                "mcdc",
+                "--libraries",
+                "electron",
+                "--data-dir",
+                str(data_dir),
+                "--z-min",
+                "1",
+                "--z-max",
+                "1",
+            ]
         )
         assert rc == 0
         assert mcdc_calls == [{"Z": 1, "eedl": True, "epdl": False, "eadl": False}]
 
     def test_mcdc_photon_atomic(self, data_dir, mcdc_calls) -> None:
         rc = cli.main(
-            ["mcdc", "--libraries", "photon", "atomic", "--data-dir", str(data_dir),
-             "--z-min", "1", "--z-max", "1"]
+            [
+                "mcdc",
+                "--libraries",
+                "photon",
+                "atomic",
+                "--data-dir",
+                str(data_dir),
+                "--z-min",
+                "1",
+                "--z-max",
+                "1",
+            ]
         )
         assert rc == 0
         assert mcdc_calls == [{"Z": 1, "eedl": False, "epdl": True, "eadl": True}]
@@ -341,8 +369,17 @@ class TestLibrarySelectionBehavior:
     ) -> None:
         """``all --libraries electron`` must restrict BOTH raw and mcdc."""
         rc = cli.main(
-            ["all", "--libraries", "electron", "--data-dir", str(data_dir),
-             "--z-min", "1", "--z-max", "1"]
+            [
+                "all",
+                "--libraries",
+                "electron",
+                "--data-dir",
+                str(data_dir),
+                "--z-min",
+                "1",
+                "--z-max",
+                "1",
+            ]
         )
         assert rc == 0
         assert raw_calls == ["EEDL"]

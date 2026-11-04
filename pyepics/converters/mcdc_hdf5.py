@@ -265,7 +265,9 @@ def write_mcdc_eedl(h5f: h5py.File, dataset: EEDLDataset) -> None:
     ion_grp = root.create_group("ionization")
     ion_mt = ion_grp.create_group("MT522")
     ion_mt.attrs["MT"] = np.int64(522)
-    _create_xs_dataset(ion_mt, "xs", xs_ion_total, "barns").attrs["offset"] = np.int64(0)
+    _create_xs_dataset(ion_mt, "xs", xs_ion_total, "barns").attrs["offset"] = np.int64(
+        0
+    )
     ion_mt.create_dataset("reference_frame", data=np.bytes_("LAB"))
     subs_grp = ion_mt.create_group("subshells")
 
