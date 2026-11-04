@@ -3,8 +3,6 @@ name: Dev Release to TestPyPI
 on:
   push:
     branches: [dev]
-  pull_request:
-    branches: [dev]
   workflow_dispatch:
 
 concurrency:
@@ -14,6 +12,7 @@ concurrency:
 jobs:
   dev-release-testpypi:
     name: Create dev release and publish to TestPyPI
+    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
 
     environment:
