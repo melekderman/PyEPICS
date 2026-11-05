@@ -24,9 +24,10 @@ The elastic Legendre cross sections Sigma_sl = sigma_el g_l (l = 0..3) mix
   provide moments; they are not written.
 * the small-angle screened Rutherford part, 1/(eta + 1 - mu)^2 with the
   Moliere screening parameter eta of
-  :func:`~pyepics.utils.parsing.small_angle_eta`, whose moments are evaluated
-  analytically for eta <= 0.1 and by resolved 200-point Gauss-Legendre
-  quadrature otherwise, always over [-1, 1].
+  :func:`~pyepics.utils.parsing.small_angle_eta`, whose moments
+  (:func:`~pyepics.physics.elastic.legendre_moments_screened_rutherford`) are
+  evaluated analytically for eta <= 0.1 and by resolved 200-point
+  Gauss-Legendre quadrature otherwise, always over [-1, 1].
 
 weighted by sigma_la and sigma_sa = max(sigma_el - sigma_la, 0).  With the
 transport cross sections Sigma_al = Sigma_s0 - Sigma_sl, the models match the
@@ -50,16 +51,13 @@ no deflection.  No EPICS 2025 element reaches these cases.
 
 from __future__ import annotations
 
-from functools import cache
-
 import numpy as np
 
+from pyepics.physics.elastic import legendre_moments_screened_rutherford
 from pyepics.utils.parsing import small_angle_eta
 
 # Largest energy ratio between adjacent moment tables (April / FRENSIE).
 ANCHOR_MAX_ENERGY_RATIO = 1.1
-# Gauss-Legendre order for the resolved screened Rutherford moments (eta > 0.1).
-SR_QUADRATURE_ORDER = 200
 GFP_MU_STAR = 0.9
 GFP2_BETA_MAX = 100.0
 
@@ -130,42 +128,6 @@ def legendre_moments_tabulated(mu, pdf):
     pdf = pdf / norm
     g = _NO_DEFLECTION.copy()
     g[1:] = [_trapezoid(p * pdf, mu) for p in _legendre(mu)]
-    return g
-
-
-@cache
-def _sr_quadrature():
-    return np.polynomial.legendre.leggauss(SR_QUADRATURE_ORDER)
-
-
-def legendre_moments_screened_rutherford(eta):
-    """Legendre moments g_0..g_3 of the screened Rutherford PDF
-    eta (eta + 2) / (2 (eta + 1 - mu)^2) on [-1, 1].
-
-    Integrating powers of t = 1 - mu gives m_k = <t^k> analytically.
-    For eta <= 0.1 these expressions avoid large cancelling terms and
-    resolve arbitrarily narrow peaks.  At larger eta the PDF is smooth;
-    quadrature avoids cancellation in the analytical, near-isotropic limit.
-    """
-    if eta <= 0.1:
-        # L = log(1 + 2/eta), without overflowing 2/eta for tiny eta.
-        L = np.log(eta + 2.0) - np.log(eta)
-        m1 = eta * ((1.0 + 0.5 * eta) * L - 1.0)
-        m2 = 2.0 * eta * (1.0 - m1)
-        m3 = 2.0 * eta - 1.5 * eta * m2
-        return np.array(
-            [
-                1.0,
-                1.0 - m1,
-                1.0 - 3.0 * m1 + 1.5 * m2,
-                1.0 - 6.0 * m1 + 7.5 * m2 - 2.5 * m3,
-            ],
-            dtype="f8",
-        )
-    nodes, weights = _sr_quadrature()
-    pdf = (1.0 / (eta + 1.0 - nodes) ** 2) / (2.0 / (eta * (eta + 2.0)))
-    g = _NO_DEFLECTION.copy()
-    g[1:] = [np.dot(weights, p * pdf) for p in _legendre(nodes)]
     return g
 
 

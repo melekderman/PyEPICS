@@ -30,11 +30,11 @@ from pyepics.converters.mcdc_gfp import (
     gfp2_params,
     gfp3_params,
     gfp_parameters,
-    legendre_moments_screened_rutherford,
     legendre_moments_tabulated,
     optimal_mu_star_gfp2,
 )
 from pyepics.converters.mcdc_hdf5 import write_mcdc_eedl
+from pyepics.physics.elastic import legendre_moments_screened_rutherford
 from pyepics.utils.parsing import build_pdf, linear_interpolation, small_angle_eta
 
 FIXTURES = Path(__file__).parent / "fixtures"
