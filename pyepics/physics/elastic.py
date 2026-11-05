@@ -11,7 +11,9 @@ Screened Rutherford elastic scattering
 Legendre moments of the screened Rutherford angular distribution that
 describes small-angle elastic scattering beyond the EEDL large-angle
 tables.  The screening parameter ``eta`` comes from
-:func:`pyepics.utils.parsing.small_angle_eta`.
+:func:`pyepics.utils.parsing.small_angle_eta`.  Also holds the log-log
+densification of the large-angle cosine tables used to interpolate moments
+in energy.
 """
 
 from __future__ import annotations
@@ -20,10 +22,15 @@ from functools import cache
 
 import numpy as np
 
+# Largest energy ratio between adjacent moment tables (April / FRENSIE).
+ANCHOR_MAX_ENERGY_RATIO = 1.1
 # Gauss-Legendre order for the resolved screened Rutherford moments (eta > 0.1).
 SR_QUADRATURE_ORDER = 200
 
 _NO_DEFLECTION = np.array([1.0, 0.0, 0.0, 0.0])
+
+# np.trapezoid needs NumPy >= 2.0; np.trapz is the same rule in older releases.
+_trapezoid = getattr(np, "trapezoid", None) or np.trapz
 
 
 def _legendre(mu):
@@ -65,3 +72,44 @@ def legendre_moments_screened_rutherford(eta):
     g = _NO_DEFLECTION.copy()
     g[1:] = [np.dot(weights, p * pdf) for p in _legendre(nodes)]
     return g
+
+
+def insert_log_log_tables(energy, offset, value, pdf):
+    """Insert log-log interpolated cosine tables so that no two adjacent
+    energies differ by more than :data:`ANCHOR_MAX_ENERGY_RATIO`.
+
+    The evaluated tables are returned unchanged.
+    """
+    ends = list(offset[1:]) + [len(value)]
+    tables = [
+        (energy[i], value[offset[i] : ends[i]], pdf[offset[i] : ends[i]])
+        for i in range(len(energy))
+    ]
+    out = []
+    for (e0, mu0, p0), (e1, mu1, p1) in zip(tables[:-1], tables[1:], strict=True):
+        out.append((e0, mu0, p0))
+        ratio = e1 / e0
+        if ratio <= ANCHOR_MAX_ENERGY_RATIO:
+            continue
+        n = max(1, int(np.ceil(np.log(ratio) / np.log(ANCHOR_MAX_ENERGY_RATIO))) - 1)
+        mu = np.union1d(mu0, mu1)
+        lo, hi = np.interp(mu, mu0, p0), np.interp(mu, mu1, p1)
+        if np.any(lo <= 0.0) or np.any(hi <= 0.0):
+            raise ValueError(
+                f"Cosine tables at {e0} and {e1} eV have non-positive PDF values; "
+                "log-log interpolation is undefined."
+            )
+        lo, hi = np.log(lo), np.log(hi)
+        for e in np.exp(np.linspace(np.log(e0), np.log(e1), n + 2)[1:-1]):
+            t = (np.log(e) - np.log(e0)) / (np.log(e1) - np.log(e0))
+            p = np.exp(lo + t * (hi - lo))
+            out.append((e, mu, p / _trapezoid(p, mu)))
+    out.append(tables[-1])
+
+    new_offset = np.cumsum([0] + [len(t[1]) for t in out[:-1]])
+    return (
+        np.array([t[0] for t in out], dtype="f8"),
+        new_offset.astype(np.asarray(offset).dtype),
+        np.concatenate([t[1] for t in out]),
+        np.concatenate([t[2] for t in out]),
+    )
