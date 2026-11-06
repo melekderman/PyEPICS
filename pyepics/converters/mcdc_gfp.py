@@ -18,15 +18,17 @@ The elastic Legendre cross sections Sigma_sl = sigma_el g_l (l = 0..3) mix
 * the large-angle EEDL (MT525) cosine tables, whose moments g_l come from the
   trapezoid rule at each table and are interpolated linearly in energy.
   Tables are first inserted by log-log energy interpolation until adjacent
-  energies differ by at most :data:`ANCHOR_MAX_ENERGY_RATIO` (PyEEDL
+  energies differ by at most
+  :data:`~pyepics.physics.elastic.ANCHOR_MAX_ENERGY_RATIO` (PyEEDL
   ``densify_angular_grid``; FRENSIE V&V for EEDL, Kersting et al., Nucl. Sci.
   Eng. 2019, found log-log energy interpolation best).  These tables only
   provide moments; they are not written.
 * the small-angle screened Rutherford part, 1/(eta + 1 - mu)^2 with the
   Moliere screening parameter eta of
-  :func:`~pyepics.utils.parsing.small_angle_eta`, whose moments are evaluated
-  analytically for eta <= 0.1 and by resolved 200-point Gauss-Legendre
-  quadrature otherwise, always over [-1, 1].
+  :func:`~pyepics.utils.parsing.small_angle_eta`, whose moments
+  (:func:`~pyepics.physics.elastic.legendre_moments_screened_rutherford`) are
+  evaluated analytically for eta <= 0.1 and by resolved 200-point
+  Gauss-Legendre quadrature otherwise, always over [-1, 1].
 
 weighted by sigma_la and sigma_sa = max(sigma_el - sigma_la, 0).  With the
 transport cross sections Sigma_al = Sigma_s0 - Sigma_sl, the models match the
@@ -50,16 +52,14 @@ no deflection.  No EPICS 2025 element reaches these cases.
 
 from __future__ import annotations
 
-from functools import cache
-
 import numpy as np
 
+from pyepics.physics.elastic import (
+    insert_log_log_tables,
+    legendre_moments_screened_rutherford,
+)
 from pyepics.utils.parsing import small_angle_eta
 
-# Largest energy ratio between adjacent moment tables (April / FRENSIE).
-ANCHOR_MAX_ENERGY_RATIO = 1.1
-# Gauss-Legendre order for the resolved screened Rutherford moments (eta > 0.1).
-SR_QUADRATURE_ORDER = 200
 GFP_MU_STAR = 0.9
 GFP2_BETA_MAX = 100.0
 
@@ -67,47 +67,6 @@ _NO_DEFLECTION = np.array([1.0, 0.0, 0.0, 0.0])
 
 # np.trapezoid needs NumPy >= 2.0; np.trapz is the same rule in older releases.
 _trapezoid = getattr(np, "trapezoid", None) or np.trapz
-
-
-def _insert_log_log_tables(energy, offset, value, pdf):
-    """Insert log-log interpolated cosine tables so that no two adjacent
-    energies differ by more than :data:`ANCHOR_MAX_ENERGY_RATIO`.
-
-    The evaluated tables are returned unchanged.
-    """
-    ends = list(offset[1:]) + [len(value)]
-    tables = [
-        (energy[i], value[offset[i] : ends[i]], pdf[offset[i] : ends[i]])
-        for i in range(len(energy))
-    ]
-    out = []
-    for (e0, mu0, p0), (e1, mu1, p1) in zip(tables[:-1], tables[1:], strict=True):
-        out.append((e0, mu0, p0))
-        ratio = e1 / e0
-        if ratio <= ANCHOR_MAX_ENERGY_RATIO:
-            continue
-        n = max(1, int(np.ceil(np.log(ratio) / np.log(ANCHOR_MAX_ENERGY_RATIO))) - 1)
-        mu = np.union1d(mu0, mu1)
-        lo, hi = np.interp(mu, mu0, p0), np.interp(mu, mu1, p1)
-        if np.any(lo <= 0.0) or np.any(hi <= 0.0):
-            raise ValueError(
-                f"Cosine tables at {e0} and {e1} eV have non-positive PDF values; "
-                "log-log interpolation is undefined."
-            )
-        lo, hi = np.log(lo), np.log(hi)
-        for e in np.exp(np.linspace(np.log(e0), np.log(e1), n + 2)[1:-1]):
-            t = (np.log(e) - np.log(e0)) / (np.log(e1) - np.log(e0))
-            p = np.exp(lo + t * (hi - lo))
-            out.append((e, mu, p / _trapezoid(p, mu)))
-    out.append(tables[-1])
-
-    new_offset = np.cumsum([0] + [len(t[1]) for t in out[:-1]])
-    return (
-        np.array([t[0] for t in out], dtype="f8"),
-        new_offset.astype(np.asarray(offset).dtype),
-        np.concatenate([t[1] for t in out]),
-        np.concatenate([t[2] for t in out]),
-    )
 
 
 def _legendre(mu):
@@ -130,42 +89,6 @@ def legendre_moments_tabulated(mu, pdf):
     pdf = pdf / norm
     g = _NO_DEFLECTION.copy()
     g[1:] = [_trapezoid(p * pdf, mu) for p in _legendre(mu)]
-    return g
-
-
-@cache
-def _sr_quadrature():
-    return np.polynomial.legendre.leggauss(SR_QUADRATURE_ORDER)
-
-
-def legendre_moments_screened_rutherford(eta):
-    """Legendre moments g_0..g_3 of the screened Rutherford PDF
-    eta (eta + 2) / (2 (eta + 1 - mu)^2) on [-1, 1].
-
-    Integrating powers of t = 1 - mu gives m_k = <t^k> analytically.
-    For eta <= 0.1 these expressions avoid large cancelling terms and
-    resolve arbitrarily narrow peaks.  At larger eta the PDF is smooth;
-    quadrature avoids cancellation in the analytical, near-isotropic limit.
-    """
-    if eta <= 0.1:
-        # L = log(1 + 2/eta), without overflowing 2/eta for tiny eta.
-        L = np.log(eta + 2.0) - np.log(eta)
-        m1 = eta * ((1.0 + 0.5 * eta) * L - 1.0)
-        m2 = 2.0 * eta * (1.0 - m1)
-        m3 = 2.0 * eta - 1.5 * eta * m2
-        return np.array(
-            [
-                1.0,
-                1.0 - m1,
-                1.0 - 3.0 * m1 + 1.5 * m2,
-                1.0 - 6.0 * m1 + 7.5 * m2 - 2.5 * m3,
-            ],
-            dtype="f8",
-        )
-    nodes, weights = _sr_quadrature()
-    pdf = (1.0 / (eta + 1.0 - nodes) ** 2) / (2.0 / (eta * (eta + 2.0)))
-    g = _NO_DEFLECTION.copy()
-    g[1:] = [np.dot(weights, p * pdf) for p in _legendre(nodes)]
     return g
 
 
@@ -531,7 +454,7 @@ def build_gfp_data(
     if np.any(np.diff(table_energy) <= 0.0):
         raise ValueError("Large-angle cosine tables must have increasing energies.")
 
-    anchor_energy, offset, mu, pdf = _insert_log_log_tables(
+    anchor_energy, offset, mu, pdf = insert_log_log_tables(
         np.asarray(table_energy, dtype="f8"),
         np.asarray(table_offset),
         np.asarray(table_mu, dtype="f8"),

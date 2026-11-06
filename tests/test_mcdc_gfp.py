@@ -23,18 +23,20 @@ import numpy as np
 import pytest
 
 from pyepics.converters.mcdc_gfp import (
-    _insert_log_log_tables,
     _trapezoid,
     dk_fp_params,
     elastic_moments,
     gfp2_params,
     gfp3_params,
     gfp_parameters,
-    legendre_moments_screened_rutherford,
     legendre_moments_tabulated,
     optimal_mu_star_gfp2,
 )
 from pyepics.converters.mcdc_hdf5 import write_mcdc_eedl
+from pyepics.physics.elastic import (
+    insert_log_log_tables,
+    legendre_moments_screened_rutherford,
+)
 from pyepics.utils.parsing import build_pdf, linear_interpolation, small_angle_eta
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -588,7 +590,7 @@ def _reference_log_log_tables(tables, max_ratio=1.1):
 def test_inserted_tables_match_reference():
     m0, p0 = np.array([-1.0, 0.0, 1.0]), np.array([0.2, 0.5, 0.8])
     m1, p1 = np.array([-1.0, 0.5, 1.0]), np.array([0.1, 0.4, 1.4]) / 0.825
-    grid, offset, value, pdf = _insert_log_log_tables(
+    grid, offset, value, pdf = insert_log_log_tables(
         np.array([1.0e3, 4.0e3]),
         np.array([0, 3]),
         np.concatenate([m0, m1]),
@@ -606,7 +608,7 @@ def test_inserted_tables_match_reference():
 
 def test_inserted_tables_reject_non_positive_pdf():
     with pytest.raises(ValueError, match="log-log"):
-        _insert_log_log_tables(
+        insert_log_log_tables(
             np.array([1.0e3, 4.0e3]),
             np.array([0, 2]),
             np.array([-1.0, 1.0, -1.0, 1.0]),

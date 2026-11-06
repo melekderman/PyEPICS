@@ -9,6 +9,8 @@ PyEPICS Documentation
    user_guide
    pipeline
    data_sources
+   multigroup_theory
+   mg_hdf5_format
    api
 
 Getting Started

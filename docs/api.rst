@@ -33,6 +33,12 @@ Models
 .. automodule:: pyepics.models.records
    :members:
 
+Multigroup
+----------
+
+.. automodule:: pyepics.multigroup.models
+   :members:
+
 Converters
 ----------
 

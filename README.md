@@ -72,11 +72,13 @@ The package follows a strict layered dependency graph:
 
 ```
 utils ← models ← readers ← converters (raw_hdf5 / mcdc_hdf5)
+utils ← physics ← converters (mcdc_gfp)
 ```
 
 | Layer | Responsibility |
 |---|---|
 | **utils** | ENDF parsing helpers (`float_endf`, `parse_mf26_mt525`, …), validation routines, physical constants, MF/MT mapping tables |
+| **physics** | Format-agnostic physics shared by converters (currently screened Rutherford elastic moments); depends only on `utils` |
 | **models** | Typed `dataclass` records (`EEDLDataset`, `EPDLDataset`, `EADLDataset`) — the sole output of readers and sole input to converters |
 | **readers** | `EEDLReader`, `EPDLReader`, `EADLReader` — parse ENDF files via the `endf` library and return model instances |
 | **converters** | Two-step conversion: `raw_hdf5` (full-fidelity) and `mcdc_hdf5` (transport-optimised) |
