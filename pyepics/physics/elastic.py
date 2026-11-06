@@ -43,15 +43,26 @@ def _sr_quadrature():
     return np.polynomial.legendre.leggauss(SR_QUADRATURE_ORDER)
 
 
-def legendre_moments_screened_rutherford(eta):
-    """Legendre moments g_0..g_3 of the screened Rutherford PDF
+def legendre_moments_screened_rutherford(eta, order=3):
+    """Legendre moments g_0..g_order of the screened Rutherford PDF
     eta (eta + 2) / (2 (eta + 1 - mu)^2) on [-1, 1].
 
-    Integrating powers of t = 1 - mu gives m_k = <t^k> analytically.
-    For eta <= 0.1 these expressions avoid large cancelling terms and
-    resolve arbitrarily narrow peaks.  At larger eta the PDF is smooth;
-    quadrature avoids cancellation in the analytical, near-isotropic limit.
+    For ``order = 3`` (the default), integrating powers of t = 1 - mu gives
+    m_k = <t^k> analytically.  For eta <= 0.1 these expressions avoid large
+    cancelling terms and resolve arbitrarily narrow peaks.  At larger eta the
+    PDF is smooth; quadrature avoids cancellation in the analytical,
+    near-isotropic limit.
+
+    Higher orders use :func:`_moments_resolved` for every eta, which agrees
+    with the analytical result for ``order = 3`` to about 1e-12.
+
+    Returns
+    -------
+    numpy.ndarray
+        Shape ``(order + 1,)``; ``g[0]`` is exactly 1.
     """
+    if order != 3:
+        return _moments_resolved(eta, order)
     if eta <= 0.1:
         # L = log(1 + 2/eta), without overflowing 2/eta for tiny eta.
         L = np.log(eta + 2.0) - np.log(eta)
@@ -113,3 +124,77 @@ def insert_log_log_tables(energy, offset, value, pdf):
         np.concatenate([t[1] for t in out]),
         np.concatenate([t[2] for t in out]),
     )
+
+
+def _moments_resolved(eta, order):
+    """Moments g_0..g_order by quadrature in u = log(1 + (1 - mu) / eta)
+
+    Then p(mu) |dmu| = (eta + 2) / 2 exp(-u) du on [0, log(1 + 2 / eta)],
+    which has no narrow peak for any eta, so a fixed Gauss-Legendre rule
+    resolves it and the Legendre polynomials are evaluated directly.
+    """
+    if order < 0:
+        raise ValueError("Legendre order must be non-negative.")
+    nodes, weights = _sr_quadrature()
+    length = np.log1p(2.0 / eta)
+    u = 0.5 * length * (nodes + 1.0)
+    mu = np.clip(1.0 - eta * np.expm1(u), -1.0, 1.0)
+    w = weights * 0.5 * length * (1.0 + 0.5 * eta) * np.exp(-u)
+    g = w @ np.polynomial.legendre.legvander(mu, order)
+    g[0] = 1.0
+    return g
+
+
+def tabulated_legendre_moments(mu, pdf, order):
+    """Legendre moments g_0..g_order of a lin-lin tabulated cosine PDF
+
+    The PDF is normalised by the trapezoid rule, which is exact for a
+    piecewise-linear function.  Each interval is integrated with a
+    Gauss-Legendre rule exact for the product of the linear PDF and
+    ``P_order``, so the moments carry no quadrature error however coarse the
+    table.
+
+    Parameters
+    ----------
+    mu : array_like
+        Cosines, shape ``(N,)``, ``N >= 2``, non-decreasing.
+    pdf : array_like
+        PDF values at *mu*, shape ``(N,)``, with a positive integral.
+    order : int
+        Highest Legendre order, ``>= 0``.
+
+    Returns
+    -------
+    numpy.ndarray
+        Shape ``(order + 1,)``; ``g[0]`` is exactly 1.
+
+    Raises
+    ------
+    ValueError
+        If the table is too short, not sorted, or has a non-positive area.
+    """
+    mu = np.asarray(mu, dtype="f8")
+    pdf = np.asarray(pdf, dtype="f8")
+    if mu.ndim != 1 or mu.shape != pdf.shape or mu.size < 2:
+        raise ValueError("Cosine table needs at least two matching mu and pdf values.")
+    if np.any(np.diff(mu) < 0.0):
+        raise ValueError("Cosine table needs non-decreasing mu values.")
+    if order < 0:
+        raise ValueError("Legendre order must be non-negative.")
+    norm = _trapezoid(pdf, mu)
+    if norm <= 0.0:
+        raise ValueError("Cosine table has a non-positive integral.")
+    nodes, weights = np.polynomial.legendre.leggauss(order // 2 + 2)
+    half = 0.5 * np.diff(mu)[:, None]
+    mid = 0.5 * (mu[1:] + mu[:-1])[:, None]
+    x = mid + half * nodes[None, :]
+    frac = 0.5 * (nodes[None, :] + 1.0)
+    p = pdf[:-1, None] + (pdf[1:] - pdf[:-1])[:, None] * frac
+    g = np.einsum(
+        "ij,ijl->l",
+        half * weights[None, :] * p,
+        np.polynomial.legendre.legvander(x, order),
+    )
+    g = g / norm
+    g[0] = 1.0
+    return g
