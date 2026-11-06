@@ -6,15 +6,17 @@
 # -----------------------------------------------------------------------------
 
 """
-Collapse pointwise xs (or BFP coefficients) into multigroup values
+Collapse of pointwise cross sections and BFP coefficients onto energy groups
 
-A group value is the weighted average over the group,
+A multigroup value is the average of the pointwise quantity over the group,
+weighted by an approximate particle flux spectrum ``w(E)``,
 
-.. math:: f_g = \\frac{\\int_g f(E)\\, w(E)\\, dE}{\\int_g w(E)\\, dE},
+.. math:: f_g = \\frac{\\int_g f(E)\\, w(E)\\, dE}{\\int_g w(E)\\, dE}.
 
-which for ``w = 1`` is Eqs. (4), (8) and (9) of Bienvenue et al. (J. Comput.
-Phys. 524 (2025) 113740).  Bounds, weighting and data are provided by the
-caller; this module contains only integration numerics.
+With constant flux (``w = 1``) this is the group-averaged cross section,
+stopping power and straggling of Bienvenue et al. (J. Comput. Phys. 524
+(2025) 113740).  The group bounds, weighting spectrum and pointwise data are
+provided by the caller.
 
 The integral over each group is a sum of Gauss-Legendre rules, one per
 segment between the break energies the caller supplies (normally the energy
@@ -38,7 +40,7 @@ from pyepics.multigroup.weighting import WeightingSpectrum, resolve, uniform
 
 @dataclass(frozen=True)
 class GroupQuadrature:
-    """Quadrature nodes for the integral over every group of a structure
+    """Quadrature nodes and weights for integrating over every energy group
 
     Parameters
     ----------
@@ -70,11 +72,13 @@ def group_quadrature(
     n_points: int = 4,
     max_ratio: float = 1.5,
 ) -> GroupQuadrature:
-    """Gauss-Legendre rule over each group, split at *breaks*
+    """Gauss-Legendre integration rule for every group of a structure
 
-    Segments wider than a factor *max_ratio* in energy are split further into
-    geometrically spaced pieces, so the accuracy for smooth weights such as
-    ``1/E`` does not depend on how coarse *breaks* is.
+    Each group is split into segments at *breaks*, and a Gauss-Legendre rule
+    is placed on each segment.  Segments wider than a factor *max_ratio* in
+    energy are split further into geometrically spaced pieces, so the
+    accuracy for smooth weights such as ``1/E`` does not depend on how
+    coarse *breaks* is.
 
     Parameters
     ----------
@@ -88,6 +92,16 @@ def group_quadrature(
         Gauss-Legendre points per segment.
     max_ratio : float, optional
         Largest ratio between the ends of a segment, ``> 1``.
+
+    Returns
+    -------
+    GroupQuadrature
+        Nodes and weights of all groups.
+
+    Raises
+    ------
+    ValidationError
+        If *n_points* is below 1 or *max_ratio* does not exceed 1.
     """
     if n_points < 1:
         raise ValidationError("group_quadrature: n_points must be at least 1.")
@@ -96,43 +110,45 @@ def group_quadrature(
     breaks = (
         np.empty(0) if breaks is None else np.unique(np.asarray(breaks, dtype="f8"))
     )
-    nodes, weights = np.polynomial.legendre.leggauss(n_points)
-    energies, wts, groups = [], [], []
+    gauss_nodes, gauss_weights = np.polynomial.legendre.leggauss(n_points)
+    node_energies, node_weights, node_groups = [], [], []
     bounds = structure.energy
-    for g in range(structure.n_groups):
-        lo, hi = bounds[g + 1], bounds[g]
-        inside = breaks[(breaks > lo) & (breaks < hi)]
-        edges = _split_wide(np.concatenate([[lo], inside, [hi]]), max_ratio)
-        half = 0.5 * np.diff(edges)[:, None]
-        mid = 0.5 * (edges[1:] + edges[:-1])[:, None]
-        energies.append((mid + half * nodes[None, :]).ravel())
-        wts.append((half * weights[None, :]).ravel())
-        groups.append(np.full(energies[-1].size, g))
+    for group in range(structure.n_groups):
+        group_lower, group_upper = bounds[group + 1], bounds[group]
+        breaks_in_group = breaks[(breaks > group_lower) & (breaks < group_upper)]
+        segment_edges = _split_wide(
+            np.concatenate([[group_lower], breaks_in_group, [group_upper]]), max_ratio
+        )
+        half_width = 0.5 * np.diff(segment_edges)[:, None]
+        midpoint = 0.5 * (segment_edges[1:] + segment_edges[:-1])[:, None]
+        node_energies.append((midpoint + half_width * gauss_nodes[None, :]).ravel())
+        node_weights.append((half_width * gauss_weights[None, :]).ravel())
+        node_groups.append(np.full(node_energies[-1].size, group))
     return GroupQuadrature(
-        np.concatenate(energies),
-        np.concatenate(wts),
-        np.concatenate(groups),
+        np.concatenate(node_energies),
+        np.concatenate(node_weights),
+        np.concatenate(node_groups),
         structure.n_groups,
         float(structure.energy[-1]),
     )
 
 
 def _split_wide(edges: np.ndarray, max_ratio: float) -> np.ndarray:
-    """Subdivide segments whose end energies differ by more than *max_ratio*"""
-    out = [edges[0]]
-    for a, b in zip(edges[:-1], edges[1:], strict=True):
-        if a > 0.0 and b / a > max_ratio:
-            n = int(np.ceil(np.log(b / a) / np.log(max_ratio)))
-            out.extend(np.geomspace(a, b, n + 1)[1:])
+    """Split segments whose end energies differ by more than *max_ratio*"""
+    split_edges = [edges[0]]
+    for lower, upper in zip(edges[:-1], edges[1:], strict=True):
+        if lower > 0.0 and upper / lower > max_ratio:
+            n_pieces = int(np.ceil(np.log(upper / lower) / np.log(max_ratio)))
+            split_edges.extend(np.geomspace(lower, upper, n_pieces + 1)[1:])
         else:
-            out.append(b)
-    return np.array(out)
+            split_edges.append(upper)
+    return np.array(split_edges)
 
 
 def collapse_nodes(
     values: np.ndarray, quadrature: GroupQuadrature, weight: WeightingSpectrum | str
 ) -> np.ndarray:
-    """Weighted average of *values* (evaluated at the quadrature nodes) per group
+    """Flux-weighted group average of a quantity evaluated at the quadrature nodes
 
     Parameters
     ----------
@@ -166,29 +182,33 @@ def collapse_nodes(
             f"collapse: values have {values.shape[0]} nodes, quadrature has "
             f"{quadrature.energy.size}."
         )
-    w = quadrature.weight * spectrum(quadrature.energy)
-    norm = np.bincount(quadrature.group, weights=w, minlength=quadrature.n_groups)
-    if np.any(norm <= 0.0):
+    flux_weight = quadrature.weight * spectrum(quadrature.energy)
+    group_flux = np.bincount(
+        quadrature.group, weights=flux_weight, minlength=quadrature.n_groups
+    )
+    if np.any(group_flux <= 0.0):
         raise ValidationError(
             f"collapse: weighting spectrum '{spectrum.name}' integrates to zero "
-            f"over group {int(np.argmax(norm <= 0.0))}."
+            f"over group {int(np.argmax(group_flux <= 0.0))}."
         )
-    flat = values.reshape(values.shape[0], -1)
-    total = np.zeros((quadrature.n_groups, flat.shape[1]))
-    np.add.at(total, quadrature.group, w[:, None] * flat)
-    return (total / norm[:, None]).reshape((quadrature.n_groups,) + values.shape[1:])
+    flat_values = values.reshape(values.shape[0], -1)
+    weighted_sum = np.zeros((quadrature.n_groups, flat_values.shape[1]))
+    np.add.at(weighted_sum, quadrature.group, flux_weight[:, None] * flat_values)
+    return (weighted_sum / group_flux[:, None]).reshape(
+        (quadrature.n_groups,) + values.shape[1:]
+    )
 
 
-# collapse( EEDL CE cross-section, structure : GroupStructure, weighting) -> GroupXS
 def collapse(
     pointwise_xs: CrossSectionRecord,
     structure: GroupStructure,
     weight: WeightingSpectrum | str = uniform,
 ) -> GroupXS:
-    """Collapse a pointwise cross-section table onto *structure*
+    """Group-averaged cross section from a pointwise cross-section table
 
-    The table is interpolated linearly in energy (ENDF ``INT = 2``) and taken
-    as zero outside its energy range.
+    The cross section is interpolated linearly in energy (ENDF ``INT = 2``)
+    and taken as zero outside the table's energy range, then averaged over
+    each group with the weighting spectrum.
 
     Parameters
     ----------

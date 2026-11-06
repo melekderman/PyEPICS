@@ -6,13 +6,25 @@
 # -----------------------------------------------------------------------------
 
 """
-Calculation of Bolzmann Fokker-Planck (BFP) coefficients from EEDL data.
+Boltzmann-Fokker-Planck (BFP) electron data from EEDL
+
+Electron collisions are split by a cutoff energy into *soft* collisions, which
+lose little energy and are treated as continuous slowing down (stopping power
+and energy straggling), and *catastrophic* collisions, which are kept as
+discrete group-to-group scattering (see :func:`cutoff_energy`).
+
+The pointwise soft stopping power and straggling are computed from the EEDL
+energy-loss spectra, the catastrophic scattering from the same spectra and the
+collision kinematics, and :func:`generate` collapses everything onto an energy
+group structure, following Bienvenue et al. (J. Comput. Phys. 524 (2025)
+113740).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 
 import numpy as np
 
@@ -31,8 +43,23 @@ from pyepics.multigroup.weighting import WeightingSpectrum
 
 
 class CutoffModel(StrEnum):
+    """Convention that separates soft from catastrophic collisions
+
+    See :func:`cutoff_energy`.
+    """
+
     RADIANT = "RADIANT"
     CEPXS = "CEPXS"
+
+
+def _group_of(structure: GroupStructure, energy: np.ndarray) -> np.ndarray:
+    """Group index ``g`` with ``e[g + 1] < E <= e[g]``, for an array of energies
+
+    Vectorised version of :meth:`GroupStructure.group_of`; energies outside the
+    structure get an index outside ``0..G-1``.
+    """
+    bounds = structure.energy
+    return bounds.size - 1 - np.searchsorted(bounds[::-1], energy, side="left")
 
 
 def cutoff_energy(
@@ -51,8 +78,8 @@ def cutoff_energy(
     ``RADIANT``
         One group below the current energy, linear in ``E`` through
         ``(e[g], e[g + 1])`` and ``(e[g + 1], e[g + 2])``
-        (Bienvenue et al., J. Comput. Phys. 524 (2025) 113740, Eq. 10).
-        Continuous across group bounds.
+        (Bienvenue et al., J. Comput. Phys. 524 (2025) 113740, cutoff energy
+        definition).  Continuous across group bounds.
     ``CEPXS``
         The lower bound of the adjacent group, ``e[g + 2]``: soft collisions
         are those scattering into non-adjacent energy groups. Piecewise
@@ -77,100 +104,138 @@ def cutoff_energy(
         ``Ec(E)`` in eV, same shape as *energy*, with ``0 <= Ec <= E``.
     """
     cutoff = _coerce_cutoff(cutoff)
-    e = np.asarray(energy, dtype="f8")
+    energy = np.asarray(energy, dtype="f8")
     bounds = structure.energy
-    n_groups = structure.n_groups
-    padded = np.append(bounds, 0.0)  # e[G + 1] = 0
-
-    # Group index g with e[g + 1] < E <= e[g]; same rule as GroupStructure.group_of
-    g = bounds.size - 1 - np.searchsorted(bounds[::-1], e, side="left")
-    g = np.clip(g, 0, n_groups - 1)
+    bounds_to_zero = np.append(bounds, 0.0)  # e[G + 1] = 0
+    group = np.clip(_group_of(structure, energy), 0, structure.n_groups - 1)
 
     if cutoff == CutoffModel.CEPXS:
-        ec = padded[g + 2]
+        energy_cutoff = bounds_to_zero[group + 2]
     else:
-        slope = (padded[g + 1] - padded[g + 2]) / (padded[g] - padded[g + 1])
-        ec = padded[g + 1] + slope * (e - padded[g])
-    ec = np.where(e < bounds[-1], 0.0, ec)
-    return np.clip(ec, 0.0, e)
+        e_g = bounds_to_zero[group]
+        e_g1 = bounds_to_zero[group + 1]
+        e_g2 = bounds_to_zero[group + 2]
+        energy_cutoff = e_g1 + (e_g1 - e_g2) / (e_g - e_g1) * (energy - e_g)
+    energy_cutoff = np.where(energy < bounds[-1], 0.0, energy_cutoff)
+    return np.clip(energy_cutoff, 0.0, energy)
 
 
-_EXCITATION = "excitation"
+def _interp_table(energy, table_energy, values) -> np.ndarray:
+    """Tabulated quantity at *energy*: linear in energy, zero outside the table"""
+    return np.interp(energy, table_energy, values, left=0.0, right=0.0)
 
 
-def _bracket(incident: np.ndarray, energy: np.ndarray):
-    """Neighbouring tabulated incident energies and the mixing weight
+def _ionization_subshells(dataset: EEDLDataset, owner: str):
+    """Yield ``(knock_on_spectra, binding_energy, cross_section_record)`` per subshell
 
-    Returns ``(lo, hi, t)`` with ``t = ln(E / E_lo) / ln(E_hi / E_lo)`` clipped
-    to ``[0, 1]``: outside the tabulated range the nearest spectrum is used.
+    The binding energy is the threshold (first tabulated energy) of the
+    subshell's electroionization cross section.
     """
-    n = incident.size
-    lo = np.clip(np.searchsorted(incident, energy, side="right") - 1, 0, n - 1)
-    hi = np.minimum(lo + 1, n - 1)
-    span = np.log(incident[hi] / incident[lo])
-    safe = np.maximum(energy, np.finfo("f8").tiny)
-    t = np.divide(
-        np.log(safe / incident[lo]), span, out=np.zeros_like(energy), where=span > 0.0
+    xs = dataset.cross_sections
+    for name, spectra in dataset.distributions.items():
+        if not name.startswith("spec_"):
+            continue
+        xs_name = "xs_" + name[len("spec_") :]
+        if xs_name not in xs:
+            raise ValidationError(
+                f"{owner}: '{name}' has no cross section '{xs_name}'."
+            )
+        yield spectra, float(xs[xs_name].energy[0]), xs[xs_name]
+
+
+def _bracket(incident_energies: np.ndarray, energy: np.ndarray):
+    """Tabulated incident energies on either side of each *energy*, and the mixing weight
+
+    Returns ``(lower, upper, upper_weight)``: indices of the neighbouring
+    incident energies and ``ln(E / E_lower) / ln(E_upper / E_lower)`` clipped to
+    ``[0, 1]``.  Outside the tabulated range the nearest spectrum is used.
+    """
+    n_incident = incident_energies.size
+    lower = np.clip(
+        np.searchsorted(incident_energies, energy, side="right") - 1, 0, n_incident - 1
     )
-    return lo, hi, np.clip(t, 0.0, 1.0)
+    upper = np.minimum(lower + 1, n_incident - 1)
+    log_span = np.log(incident_energies[upper] / incident_energies[lower])
+    positive_energy = np.maximum(energy, np.finfo("f8").tiny)
+    upper_weight = np.divide(
+        np.log(positive_energy / incident_energies[lower]),
+        log_span,
+        out=np.zeros_like(energy),
+        where=log_span > 0.0,
+    )
+    return lower, upper, np.clip(upper_weight, 0.0, 1.0)
 
 
-def _spectra(record: DistributionRecord):
-    """Incident energies and the ``(w, p)`` table at each, sorted by ``w``"""
-    incident = np.unique(record.inc_energy)
-    tables = []
-    for e_in in incident:
-        mask = record.inc_energy == e_in
-        order = np.argsort(record.value[mask], kind="stable")
-        tables.append((record.value[mask][order], record.probability[mask][order]))
-    return incident, tables
+def _spectra_by_incident_energy(record: DistributionRecord):
+    """Incident energies and the ``(energy_loss, probability)`` spectrum at each
+
+    Each spectrum is sorted by energy loss.
+    """
+    incident_energies = np.unique(record.inc_energy)
+    spectra = []
+    for incident_energy in incident_energies:
+        rows = record.inc_energy == incident_energy
+        by_loss = np.argsort(record.value[rows], kind="stable")
+        spectra.append((record.value[rows][by_loss], record.probability[rows][by_loss]))
+    return incident_energies, spectra
 
 
 def _partial_moments(
-    w: np.ndarray, p: np.ndarray, upper: np.ndarray
+    loss: np.ndarray, probability: np.ndarray, loss_limit: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """``integral w^n p dw`` for ``n = 0, 1, 2`` over ``w <= upper``
+    """Integrals of ``loss^n * probability`` for ``n = 0, 1, 2`` up to *loss_limit*
 
-    ``p`` is piecewise linear in ``w`` and zero outside ``[w[0], w[-1]]``;
-    *upper* is an array of limits (``inf`` allowed).
+    The spectrum is linear between table points and zero outside
+    ``[loss[0], loss[-1]]``; *loss_limit* is an array of upper limits
+    (``inf`` allowed).  The integrals are the probability of a loss up to the
+    limit, and the first and second moments of that part of the spectrum.
     """
-    w0, w1 = w[:-1][None, :], w[1:][None, :]
-    dw = (w1 - w0)[0]
-    slope = np.divide(p[1:] - p[:-1], dw, out=np.zeros_like(dw), where=dw > 0.0)[
-        None, :
-    ]
-    # distance integrated into each interval, for every limit: shape (n, intervals)
-    d = np.clip(np.minimum(w1, upper[:, None]) - w0, 0.0, None)
-    p0 = p[:-1][None, :]
-    zeroth = p0 * d + slope * d**2 / 2.0
-    first = w0 * p0 * d + (w0 * slope + p0) * d**2 / 2.0 + slope * d**3 / 3.0
+    loss_lo, loss_hi = loss[:-1], loss[1:]
+    probability_lo = probability[:-1]
+    width = loss_hi - loss_lo
+    slope = np.divide(
+        probability[1:] - probability_lo,
+        width,
+        out=np.zeros_like(width),
+        where=width > 0.0,
+    )
+    # length of each interval below the limit, shape (limits, intervals)
+    length = np.clip(np.minimum(loss_hi, loss_limit[:, None]) - loss_lo, 0.0, None)
+    zeroth = probability_lo * length + slope * length**2 / 2.0
+    first = (
+        loss_lo * probability_lo * length
+        + (loss_lo * slope + probability_lo) * length**2 / 2.0
+        + slope * length**3 / 3.0
+    )
     second = (
-        w0**2 * p0 * d
-        + (w0**2 * slope + 2.0 * w0 * p0) * d**2 / 2.0
-        + (2.0 * w0 * slope + p0) * d**3 / 3.0
-        + slope * d**4 / 4.0
+        loss_lo**2 * probability_lo * length
+        + (loss_lo**2 * slope + 2.0 * loss_lo * probability_lo) * length**2 / 2.0
+        + (2.0 * loss_lo * slope + probability_lo) * length**3 / 3.0
+        + slope * length**4 / 4.0
     )
     return zeroth.sum(axis=1), first.sum(axis=1), second.sum(axis=1)
 
 
 def _mixture_moments(
-    record: DistributionRecord, energy: np.ndarray, upper: np.ndarray
+    record: DistributionRecord, energy: np.ndarray, loss_limit: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Partial moments of the spectrum at each incident *energy*
+    """Partial moments of the energy-loss spectrum at each incident *energy*
 
     The spectrum at ``E`` is the mix ``(1 - t) p_a + t p_b`` of the tabulated
     spectra at the incident energies ``E_a <= E <= E_b`` around it, with
     ``t = ln(E / E_a) / ln(E_b / E_a)``; outside the tabulated range the
-    nearest spectrum is used.  Returns ``(integral p dw, integral w p dw,
-    integral w^2 p dw)`` over ``w <= upper`` for each entry of *energy*.
+    nearest spectrum is used.  Returns the probability, mean and second moment
+    of the energy loss, each integrated up to *loss_limit*, for every entry of
+    *energy*.
     """
-    incident, tables = _spectra(record)
-    moments = np.empty((3, incident.size, energy.size))
-    for i, (w, p) in enumerate(tables):
-        moments[:, i] = _partial_moments(w, p, upper)
-    lo, hi, t = _bracket(incident, energy)
-    cols = np.arange(energy.size)
-    mixed = (1.0 - t) * moments[:, lo, cols] + t * moments[:, hi, cols]
+    incident_energies, spectra = _spectra_by_incident_energy(record)
+    moments = np.empty((3, incident_energies.size, energy.size))
+    for i, (loss, probability) in enumerate(spectra):
+        moments[:, i] = _partial_moments(loss, probability, loss_limit)
+    lower, upper, upper_weight = _bracket(incident_energies, energy)
+    column = np.arange(energy.size)
+    mixed = (1.0 - upper_weight) * moments[:, lower, column]
+    mixed += upper_weight * moments[:, upper, column]
     return mixed[0], mixed[1], mixed[2]
 
 
@@ -181,68 +246,63 @@ def _soft_loss_moment(
     order: int,
     energy: np.ndarray,
 ) -> np.ndarray:
-    """``sum_x integral over soft collisions of (energy loss)^order dsigma``"""
+    """Moment of the energy loss over the soft collisions, summed over channels
+
+    ``sum_x integral (energy loss)^order dsigma_x`` over collisions whose loss
+    is at most ``E - Ec(E)``, for ``order`` 1 (stopping power) or 2
+    (straggling).
+    """
     owner = "soft energy-loss moment"
-    xs = dataset.cross_sections
-    losses = dataset.average_energy_losses
-    loss_cut = energy - cutoff_energy(energy, structure, cutoff)  # largest soft loss
-
-    def on_grid(record_energy, values):  # lin-lin (INT = 2), zero outside the table
-        return np.interp(energy, record_energy, values, left=0.0, right=0.0)
-
+    cross_sections = dataset.cross_sections
+    average_losses = dataset.average_energy_losses
+    largest_soft_loss = energy - cutoff_energy(energy, structure, cutoff)
     total = np.zeros_like(energy)
 
-    # Excitation
-    if "xs_exc" in xs and "loss_exc" in losses:
-        sigma = on_grid(xs["xs_exc"].energy, xs["xs_exc"].cross_section)
-        loss = on_grid(losses["loss_exc"].energy, losses["loss_exc"].avg_loss)
-        total += np.where(loss <= loss_cut, sigma * loss**order, 0.0)
+    if "xs_exc" in cross_sections and "loss_exc" in average_losses:
+        xs = cross_sections["xs_exc"]
+        sigma = _interp_table(energy, xs.energy, xs.cross_section)
+        loss_table = average_losses["loss_exc"]
+        loss = _interp_table(energy, loss_table.energy, loss_table.avg_loss)
+        total += np.where(loss <= largest_soft_loss, sigma * loss**order, 0.0)
 
-    # Bremsstrahlung
-    if "xs_brem" in xs:
-        spectra = dataset.bremsstrahlung_spectra
-        if spectra is None or "loss_brem_spec" not in losses:
+    if "xs_brem" in cross_sections:
+        photon_spectra = dataset.bremsstrahlung_spectra
+        if photon_spectra is None or "loss_brem_spec" not in average_losses:
             raise ValidationError(
                 f"{owner}: 'xs_brem' needs bremsstrahlung spectra and 'loss_brem_spec'."
             )
-        sigma = on_grid(xs["xs_brem"].energy, xs["xs_brem"].cross_section)
-        _, first_soft, second_soft = _mixture_moments(spectra, energy, loss_cut)
+        xs = cross_sections["xs_brem"]
+        sigma = _interp_table(energy, xs.energy, xs.cross_section)
+        _, first_soft, second_soft = _mixture_moments(
+            photon_spectra, energy, largest_soft_loss
+        )
         if order == 1:
-            _, first_all, _ = _mixture_moments(spectra, energy, energy)
-            mean_loss = on_grid(
-                losses["loss_brem_spec"].energy, losses["loss_brem_spec"].avg_loss
-            )
-            fraction = np.divide(
+            _, first_all, _ = _mixture_moments(photon_spectra, energy, energy)
+            loss_table = average_losses["loss_brem_spec"]
+            loss = _interp_table(energy, loss_table.energy, loss_table.avg_loss)
+            soft_fraction = np.divide(
                 first_soft,
                 first_all,
                 out=np.zeros_like(first_soft),
                 where=first_all > 0.0,
             )
-            total += sigma * mean_loss * fraction
+            total += sigma * loss * soft_fraction
         else:
             total += sigma * second_soft
 
-    # Electroionization, one subshell at a time
-    for name, spectrum in dataset.distributions.items():
-        if not name.startswith("spec_"):
-            continue
-        xs_name = "xs_" + name[len("spec_") :]
-        if xs_name not in xs:
-            raise ValidationError(
-                f"{owner}: '{name}' has no cross section '{xs_name}'."
-            )
-        binding = float(xs[xs_name].energy[0])
-        sigma = on_grid(xs[xs_name].energy, xs[xs_name].cross_section)
-        limit = (
-            np.maximum(energy - binding, 0.0) / 2.0
-        )  # knock-on is the slower electron
-        prob, first, second = _mixture_moments(
-            spectrum, energy, np.minimum(loss_cut - binding, limit)
+    for knock_on_spectra, binding, xs in _ionization_subshells(dataset, owner):
+        sigma = _interp_table(energy, xs.energy, xs.cross_section)
+        # the knock-on is the slower electron, so it takes at most half the energy
+        knock_on_limit = np.maximum(energy - binding, 0.0) / 2.0
+        probability, first, second = _mixture_moments(
+            knock_on_spectra,
+            energy,
+            np.minimum(largest_soft_loss - binding, knock_on_limit),
         )
         if order == 1:
-            total += sigma * (binding * prob + first)
+            total += sigma * (binding * probability + first)
         else:
-            total += sigma * (binding**2 * prob + 2.0 * binding * first + second)
+            total += sigma * (binding**2 * probability + 2.0 * binding * first + second)
     return total
 
 
@@ -252,17 +312,15 @@ def pointwise_stopping_power(
     cutoff: CutoffModel | str = CutoffModel.RADIANT,
     energy: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Pointwise soft (restricted) electron stopping power from EEDL data
+    """Restricted (soft) electron stopping power at each energy, from EEDL data
 
-    This is the first moment of the energy loss over soft collisions,
-    ``S(E) = sum_x  integral_{loss <= E - Ec(E)} (E - E') dsigma_x``, summed
-    over the inelastic channels ``x`` (Beling 2024, Eq. 3.12, with
-    ``F_{1,0}`` the first energy-loss moment and the zeroth angular moment;
-    the angular integral is trivial because EEDL gives the inelastic cross
-    sections already integrated over angle).  Equivalent to Eqs. 45 and 81
-    of Bienvenue et al. (J. Comput. Phys. 524 (2025) 113740), the total
+    The soft stopping power is the mean energy lost per unit path length in
+    collisions that leave the electron with at least ``Ec(E)``, summed over
+    the inelastic channels (see :func:`cutoff_energy`).  It equals the total
     stopping power minus the catastrophic part, with the totals taken from
-    EEDL.  See :func:`cutoff_energy` for ``Ec(E)``.
+    EEDL (Bienvenue et al., J. Comput. Phys. 524 (2025) 113740; Beling 2024,
+    first energy-loss moment).  Elastic scattering loses no energy and
+    contributes nothing.
 
     Channels
     --------
@@ -275,28 +333,26 @@ def pointwise_stopping_power(
         because the spectra's means sit about 1.6 % below that table; the
         unrestricted limit therefore reproduces the table.
     electroionization (each subshell)
-        The primary loses ``U + W``, with ``W`` the knock-on energy from
-        ``spec_<subshell>`` and ``U`` the binding energy, taken as the
-        threshold of ``xs_<subshell>`` (its first tabulated energy).  The
-        soft collisions are those with ``U + W <= E - Ec(E)``.  RADIANT's
-        Eq. 45 starts the catastrophic range at ``W = E - Ec(E)``, which
-        leaves ``U`` out.
-    elastic
-        No energy loss, so it contributes nothing (EEDL's angular cutoff
-        ``1 - 1e-6`` matters for the momentum transfer, not here).
+        The primary loses the binding energy ``U`` plus the knock-on energy
+        ``W`` from ``spec_<subshell>``.  ``U`` is the threshold of
+        ``xs_<subshell>`` (its first tabulated energy).  Collisions are soft
+        when ``U + W <= E - Ec(E)``; the paper starts the catastrophic range
+        at ``W = E - Ec(E)``, which leaves ``U`` out.
 
     Between the tabulated incident energies the two neighbouring spectra are
-    mixed with weights linear in ``ln E``, and within a spectrum ``p`` is
-    linear in ``E'`` (``LEP = 2``).  Mixing in the higher-energy spectrum
-    would give knock-ons more than the electron has, so the knock-on energy
-    is capped at ``(E - U) / 2`` (the EEDL convention: the knock-on is the
-    slower electron) and the photon energy at ``E``.  The file states ``INT = 2`` (weights
-    linear in ``E``), but EEDL tabulates only a handful of incident energies
-    per subshell and that reading puts the unrestricted stopping power of
-    iron about 5 % below the Bethe formula at 1-3 MeV, against about 1 % with
-    ``ln E`` weights.  With the cap, the unrestricted total (infinite cutoff)
-    is a further 2-5 % lower at 0.1-1 MeV; the soft value is unchanged
-    wherever the cutoff ``E - Ec`` is below ``(E - U) / 2``.
+    mixed with weights linear in ``ln E``, and within a spectrum the
+    probability is linear in the energy loss.  The file states weights linear
+    in ``E``, but EEDL tabulates only a handful of incident energies per
+    subshell, and that reading puts the unrestricted stopping power of iron
+    about 5 % below the Bethe formula at 1-3 MeV, against about 1 % with
+    ``ln E`` weights.
+
+    Mixing in the higher-energy spectrum would give knock-ons more than the
+    electron has, so the knock-on energy is capped at ``(E - U) / 2`` (the
+    knock-on is the slower electron) and the photon energy at ``E``.  With the
+    cap, the unrestricted total (infinite cutoff) is a further 2-5 % lower at
+    0.1-1 MeV; the soft value is unchanged wherever ``E - Ec`` is below
+    ``(E - U) / 2``.
 
     Parameters
     ----------
@@ -335,15 +391,17 @@ def pointwise_straggling(
     cutoff: CutoffModel | str = CutoffModel.RADIANT,
     energy: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Pointwise soft energy straggling: the second energy-loss moment
+    """Soft energy straggling at each energy: the mean squared energy loss
 
-    ``Omega(E) = sum_x integral_{loss <= E - Ec(E)} (E - E')^2 dsigma_x``,
-    in barns*eV^2, over the same channels, cutoff and interpolation as
-    :func:`pointwise_stopping_power` (``F_{2,0}`` in the notation of its
-    reference).  The paper has no energy straggling, so this follows the
-    stopping-power definition with ``(E - E')^2`` for ``E - E'``, with no
-    factor 1/2.  Bremsstrahlung uses the photon spectrum directly, since only
-    the first moment is tabulated separately.
+    ``Omega(E) = sum_x integral (E - E')^2 dsigma_x`` over soft collisions, in
+    barns*eV^2, with the same channels, cutoff and interpolation as
+    :func:`pointwise_stopping_power`.  The paper has no energy straggling, so
+    this follows the stopping-power definition with the squared energy loss
+    and no factor 1/2.  Bremsstrahlung uses the photon spectrum directly,
+    since only the mean loss is tabulated separately.
+
+    Parameters and return values are those of
+    :func:`pointwise_stopping_power`; the straggling is in barns*eV^2.
     """
     grid = _evaluation_grid(dataset, energy, "pointwise_straggling")
     cutoff = _coerce_cutoff(cutoff)
@@ -351,6 +409,7 @@ def pointwise_straggling(
 
 
 def _evaluation_grid(dataset: EEDLDataset, energy, owner: str) -> np.ndarray:
+    """Requested energies, or by default the total cross-section grid"""
     if energy is not None:
         return np.asarray(energy, dtype="f8")
     if "xs_tot" not in dataset.cross_sections:
@@ -359,6 +418,7 @@ def _evaluation_grid(dataset: EEDLDataset, energy, owner: str) -> np.ndarray:
 
 
 def _coerce_cutoff(cutoff: CutoffModel | str) -> CutoffModel:
+    """Cutoff convention from its name"""
     try:
         return CutoffModel(cutoff)
     except ValueError:
@@ -377,201 +437,234 @@ _BIN_NODES = np.polynomial.legendre.leggauss(6)
 
 
 def _scattering_cosine(energy: float, energy_out: np.ndarray) -> np.ndarray:
-    """Cosine of the deflection of an electron of *energy_out* (Eq. 25)
+    """Cosine of the deflection of an electron that leaves with *energy_out*
 
-    ``mu = sqrt(E' (E + 2) / (E (E' + 2)))`` with energies in units of the
-    electron rest energy; used for the scattered primary and the knock-on.
+    From the kinematics of an ionization collision of an electron of energy
+    ``E``, ``mu = sqrt(E' (E + 2) / (E (E' + 2)))`` with energies in units of
+    the electron rest energy; valid for the scattered primary and the knock-on.
     """
-    e = energy / _MEC2
-    out = np.maximum(energy_out, 0.0) / _MEC2
-    return np.sqrt(out * (e + 2.0) / (e * (out + 2.0)))
-
-
-def _bin_integrals(w, p, edges, order, cosine, limit=np.inf) -> np.ndarray:
-    """``integral p(w) P_l(mu(w)) dw`` over each bin between ascending *edges*
-
-    ``p`` is piecewise linear in ``w`` (zero outside its table and above
-    *limit*) and ``cosine`` maps ``w`` to ``mu``.  Returns shape
-    ``(len(edges) - 1, order + 1)``.
-    """
-    out = np.zeros((len(edges) - 1, order + 1))
-    inside = np.concatenate([w, [limit]])
-    inside = inside[(inside > edges[0]) & (inside < edges[-1])]
-    points = np.unique(np.concatenate([edges, inside]))
-    a, b = points[:-1], points[1:]
-    keep = (b > w[0]) & (a < min(w[-1], limit))
-    if not np.any(keep):
-        return out
-    a, b = a[keep], b[keep]
-    nodes, weights = _BIN_NODES
-    half = 0.5 * (b - a)[:, None]
-    x = 0.5 * (a + b)[:, None] + half * nodes[None, :]
-    density = np.interp(x, w, p, left=0.0, right=0.0)
-    mu = np.clip(cosine(x), -1.0, 1.0)
-    legendre = np.polynomial.legendre.legvander(mu.ravel(), order).reshape(
-        x.shape + (order + 1,)
+    energy_mec2 = energy / _MEC2
+    energy_out_mec2 = np.maximum(energy_out, 0.0) / _MEC2
+    return np.sqrt(
+        energy_out_mec2 * (energy_mec2 + 2.0) / (energy_mec2 * (energy_out_mec2 + 2.0))
     )
-    segment = ((half * weights[None, :] * density)[..., None] * legendre).sum(axis=1)
-    np.add.at(out, np.searchsorted(edges, 0.5 * (a + b), side="right") - 1, segment)
-    return out
 
 
-def _group_of(structure: GroupStructure, energy: np.ndarray) -> np.ndarray:
-    """Group index ``g`` with ``e[g + 1] < E <= e[g]`` (the ``GroupStructure.group_of`` rule)"""
-    bounds = structure.energy
-    return bounds.size - 1 - np.searchsorted(bounds[::-1], energy, side="left")
+def _primary_cosine(energy: float, binding: float, knock_on_energy: np.ndarray):
+    """Cosine of the deflection of the primary that ionizes and frees a knock-on"""
+    return _scattering_cosine(energy, energy - binding - knock_on_energy)
+
+
+def _bin_integrals(
+    transfer, density, bin_edges, order, cosine, limit=np.inf
+) -> np.ndarray:
+    """Legendre moments of the deflection, per energy bin, of a spectrum
+
+    The spectrum ``density(transfer)`` of the energy given to the secondary
+    particle (knock-on electron or photon) is linear between table points and
+    zero outside its table and above *limit*.  Integrates
+    ``density P_l(mu)`` over each bin between the ascending *bin_edges* in
+    that energy, for ``l = 0..order``, where *cosine* gives the deflection
+    cosine ``mu`` of the electron.  Returns shape ``(len(bin_edges) - 1, order + 1)``.
+    """
+    moments = np.zeros((len(bin_edges) - 1, order + 1))
+    breakpoints = np.concatenate([transfer, [limit]])
+    breakpoints = breakpoints[
+        (breakpoints > bin_edges[0]) & (breakpoints < bin_edges[-1])
+    ]
+    segment_edges = np.unique(np.concatenate([bin_edges, breakpoints]))
+    segment_lo, segment_hi = segment_edges[:-1], segment_edges[1:]
+    in_table = (segment_hi > transfer[0]) & (segment_lo < min(transfer[-1], limit))
+    if not np.any(in_table):
+        return moments
+    segment_lo, segment_hi = segment_lo[in_table], segment_hi[in_table]
+    nodes, weights = _BIN_NODES
+    half_width = 0.5 * (segment_hi - segment_lo)[:, None]
+    midpoint = 0.5 * (segment_lo + segment_hi)
+    node_energy = midpoint[:, None] + half_width * nodes[None, :]
+    node_density = np.interp(node_energy, transfer, density, left=0.0, right=0.0)
+    mu = np.clip(cosine(node_energy), -1.0, 1.0)
+    legendre = np.polynomial.legendre.legvander(mu.ravel(), order).reshape(
+        node_energy.shape + (order + 1,)
+    )
+    weighted_density = half_width * weights[None, :] * node_density
+    segment_moments = (weighted_density[..., None] * legendre).sum(axis=1)
+    bin_of_segment = np.searchsorted(bin_edges, midpoint, side="right") - 1
+    np.add.at(moments, bin_of_segment, segment_moments)
+    return moments
 
 
 def _catastrophic_ionization(dataset, structure, cutoff, energy, order):
-    """Catastrophic electroionization: totals ``(Nq,)`` and matrices ``(Nq, L+1, G)``
+    """Catastrophic electroionization cross sections at each energy
+
+    Returns the total cross section, shape ``(Nq,)``, and the group-to-group
+    Legendre scattering matrices, shape ``(Nq, L+1, G)``.
 
     The scattered primary (energy ``E' = E - U - W``) is catastrophic when
-    ``E' < Ec(E)`` (Eq. 29); every knock-on with ``W`` in the target group is
-    produced, whatever the primary does (Eq. 32).  Cosines come from the
-    kinematics of Eq. 25.
+    ``E' < Ec(E)``; every knock-on with ``W`` in the target group is produced,
+    whatever the primary does.  The deflections follow from the kinematics of
+    the collision (:func:`_scattering_cosine`).
     """
+    owner = "catastrophic ionization"
     n_groups = structure.n_groups
     bounds = structure.energy
-    ec = cutoff_energy(energy, structure, cutoff)
+    energy_cutoff = cutoff_energy(energy, structure, cutoff)
     total = np.zeros(energy.size)
     matrix = np.zeros((energy.size, order + 1, n_groups))
-    xs = dataset.cross_sections
-    for name, record in dataset.distributions.items():
-        if not name.startswith("spec_"):
-            continue
-        xs_name = "xs_" + name[len("spec_") :]
-        if xs_name not in xs:
-            raise ValidationError(
-                f"catastrophic ionization: '{name}' has no cross section '{xs_name}'."
-            )
-        binding = float(xs[xs_name].energy[0])
-        sigma = np.interp(
-            energy, xs[xs_name].energy, xs[xs_name].cross_section, left=0.0, right=0.0
+    for knock_on_spectra, binding, xs in _ionization_subshells(dataset, owner):
+        sigma = _interp_table(energy, xs.energy, xs.cross_section)
+        knock_on_limit = np.maximum(energy - binding, 0.0) / 2.0
+        probability_all, _, _ = _mixture_moments(
+            knock_on_spectra, energy, knock_on_limit
         )
-        limit = (
-            np.maximum(energy - binding, 0.0) / 2.0
-        )  # knock-on is the slower electron
-        all_prob, _, _ = _mixture_moments(record, energy, limit)
-        soft_prob, _, _ = _mixture_moments(
-            record, energy, np.minimum(energy - binding - ec, limit)
+        probability_soft, _, _ = _mixture_moments(
+            knock_on_spectra,
+            energy,
+            np.minimum(energy - binding - energy_cutoff, knock_on_limit),
         )
-        total += sigma * (all_prob - soft_prob)
+        total += sigma * (probability_all - probability_soft)
 
-        incident, tables = _spectra(record)
-        lo, hi, t = _bracket(incident, energy)
-        for q in np.flatnonzero((sigma > 0.0) & (energy > binding)):
-            e_in = energy[q]
-            available = e_in - binding
-            # primary: bins in W aligned with the target groups' bounds in E'
-            cut = available - ec[q]
-            edges_primary = np.unique(
-                np.concatenate([available - bounds, [cut]]).clip(0.0, None)
+        incident_energies, spectra = _spectra_by_incident_energy(knock_on_spectra)
+        lower, upper, upper_weight = _bracket(incident_energies, energy)
+        for node in np.flatnonzero((sigma > 0.0) & (energy > binding)):
+            incident_energy = energy[node]
+            energy_after_binding = incident_energy - binding
+            catastrophic_onset = energy_after_binding - energy_cutoff[node]
+
+            primary_cosine = partial(_primary_cosine, incident_energy, binding)
+            knock_on_cosine = partial(_scattering_cosine, incident_energy)
+
+            # primary: bins in knock-on energy aligned with the group bounds of the primary
+            primary_bin_edges = np.unique(
+                np.concatenate(
+                    [energy_after_binding - bounds, [catastrophic_onset]]
+                ).clip(0.0, None)
             )
-            mid = 0.5 * (edges_primary[1:] + edges_primary[:-1])
-            e_primary = available - mid
-            usable = (mid >= cut) & (e_primary > bounds[-1]) & (e_primary <= bounds[0])
-            target = _group_of(structure, e_primary[usable])
-            for weight, index in ((1.0 - t[q], lo[q]), (t[q], hi[q])):
-                if weight == 0.0:
+            bin_center = 0.5 * (primary_bin_edges[1:] + primary_bin_edges[:-1])
+            primary_energy_out = energy_after_binding - bin_center
+            catastrophic_bin = (
+                (bin_center >= catastrophic_onset)
+                & (primary_energy_out > bounds[-1])
+                & (primary_energy_out <= bounds[0])
+            )
+            primary_group = _group_of(structure, primary_energy_out[catastrophic_bin])
+            for mix_weight, table in (
+                (1.0 - upper_weight[node], lower[node]),
+                (upper_weight[node], upper[node]),
+            ):
+                if mix_weight == 0.0:
                     continue
-                w, p = tables[index]
+                knock_on_energy, density = spectra[table]
                 primary = _bin_integrals(
-                    w,
-                    p,
-                    edges_primary,
+                    knock_on_energy,
+                    density,
+                    primary_bin_edges,
                     order,
-                    lambda x, e_in=e_in, available=available: _scattering_cosine(
-                        e_in, available - x
-                    ),
-                    limit[q],
+                    primary_cosine,
+                    knock_on_limit[node],
                 )
-                # knock-on: bins in W are the groups themselves, ascending in energy
-                knock = _bin_integrals(
-                    w,
-                    p,
+                # knock-on: bins in knock-on energy are the groups, ascending in energy
+                knock_on = _bin_integrals(
+                    knock_on_energy,
+                    density,
                     bounds[::-1],
                     order,
-                    lambda x, e_in=e_in: _scattering_cosine(e_in, x),
-                    limit[q],
+                    knock_on_cosine,
+                    knock_on_limit[node],
                 )
-                np.add.at(matrix[q].T, target, sigma[q] * weight * primary[usable])
-                matrix[q] += sigma[q] * weight * knock[::-1].T
+                weighted = sigma[node] * mix_weight
+                np.add.at(
+                    matrix[node].T, primary_group, weighted * primary[catastrophic_bin]
+                )
+                matrix[node] += weighted * knock_on[::-1].T
     return total, matrix
 
 
 def _catastrophic_bremsstrahlung(dataset, structure, cutoff, energy, order):
-    """Catastrophic bremsstrahlung: totals and matrices for the deflected electron
+    """Catastrophic bremsstrahlung cross sections at each energy
 
-    The electron keeps its direction (``mu = 1``, Eq. 70), so all Legendre
-    moments of the group-to-group matrix are equal.  A collision is
-    catastrophic when the electron leaves below ``Ec(E)`` (Eq. 78).
+    Returns the total cross section, shape ``(Nq,)``, and the group-to-group
+    Legendre scattering matrices of the electron, shape ``(Nq, L+1, G)``.
+
+    The electron keeps its direction (``mu = 1``), so all Legendre moments of
+    the matrix are equal.  A collision is catastrophic when the electron
+    leaves below ``Ec(E)``.
     """
     n_groups = structure.n_groups
     bounds = structure.energy
     total = np.zeros(energy.size)
     matrix = np.zeros((energy.size, order + 1, n_groups))
-    xs = dataset.cross_sections
-    if "xs_brem" not in xs:
+    if "xs_brem" not in dataset.cross_sections:
         return total, matrix
-    spectra = dataset.bremsstrahlung_spectra
-    if spectra is None:
+    photon_spectra = dataset.bremsstrahlung_spectra
+    if photon_spectra is None:
         raise ValidationError(
             "catastrophic bremsstrahlung: 'xs_brem' needs bremsstrahlung spectra."
         )
-    sigma = np.interp(
-        energy, xs["xs_brem"].energy, xs["xs_brem"].cross_section, left=0.0, right=0.0
+    xs = dataset.cross_sections["xs_brem"]
+    sigma = _interp_table(energy, xs.energy, xs.cross_section)
+    energy_cutoff = cutoff_energy(energy, structure, cutoff)
+    probability_all, _, _ = _mixture_moments(photon_spectra, energy, energy)
+    probability_soft, _, _ = _mixture_moments(
+        photon_spectra, energy, energy - energy_cutoff
     )
-    ec = cutoff_energy(energy, structure, cutoff)
-    all_prob, _, _ = _mixture_moments(spectra, energy, energy)
-    soft_prob, _, _ = _mixture_moments(spectra, energy, energy - ec)
-    total = sigma * (all_prob - soft_prob)
+    total = sigma * (probability_all - probability_soft)
 
-    # photon energy k = E - E_e; target group g holds E_e in (e[g+1], min(e[g], Ec)]
-    rep = np.repeat(energy, n_groups)
-    top = np.minimum(bounds[None, :-1], ec[:, None])
-    k_low = (energy[:, None] - top).ravel()
-    k_high = (energy[:, None] - bounds[None, 1:]).ravel()
-    cdf_low, _, _ = _mixture_moments(spectra, rep, np.clip(k_low, 0.0, None))
-    cdf_high, _, _ = _mixture_moments(spectra, rep, np.clip(k_high, 0.0, None))
-    fraction = np.clip((cdf_high - cdf_low).reshape(energy.size, n_groups), 0.0, None)
-    fraction[top <= bounds[None, 1:]] = 0.0
-    matrix[:] = (sigma[:, None] * fraction)[:, None, :]
+    # The photon takes E - E_electron; target group g holds the electron energies
+    # in (e[g+1], min(e[g], Ec)], which fixes the photon energy range per group.
+    energy_per_group = np.repeat(energy, n_groups)
+    electron_energy_max = np.minimum(bounds[None, :-1], energy_cutoff[:, None])
+    photon_energy_min = (energy[:, None] - electron_energy_max).ravel()
+    photon_energy_max = (energy[:, None] - bounds[None, 1:]).ravel()
+    probability_below_min, _, _ = _mixture_moments(
+        photon_spectra, energy_per_group, np.clip(photon_energy_min, 0.0, None)
+    )
+    probability_below_max, _, _ = _mixture_moments(
+        photon_spectra, energy_per_group, np.clip(photon_energy_max, 0.0, None)
+    )
+    group_probability = np.clip(
+        (probability_below_max - probability_below_min).reshape(energy.size, n_groups),
+        0.0,
+        None,
+    )
+    group_probability[electron_energy_max <= bounds[None, 1:]] = 0.0
+    matrix[:] = (sigma[:, None] * group_probability)[:, None, :]
     return total, matrix
 
 
 def _catastrophic_excitation(dataset, structure, cutoff, energy, order):
-    """Catastrophic excitation: an undeflected down-scatter by ``loss_exc``
+    """Catastrophic excitation cross sections at each energy
 
-    Not in the RADIANT paper.  A collision is catastrophic when its loss
-    exceeds ``E - Ec(E)``, which for EEDL's tens-of-eV losses only happens
-    for the lowest groups.  The indicator is evaluated at the quadrature
-    nodes, so this contribution is only as accurate as that sampling.
+    Returns the total cross section, shape ``(Nq,)``, and the group-to-group
+    Legendre scattering matrices, shape ``(Nq, L+1, G)``.
+
+    Excitation is an undeflected down-scatter by the average loss
+    ``loss_exc``, which the RADIANT paper does not treat.  A collision is
+    catastrophic when its loss exceeds ``E - Ec(E)``, which for EEDL's
+    tens-of-eV losses only happens in the lowest groups.  The sharp
+    soft/catastrophic switch is sampled at the quadrature nodes, so this
+    contribution is only as accurate as that sampling.
     """
-    n_groups = structure.n_groups
+    cross_sections = dataset.cross_sections
+    average_losses = dataset.average_energy_losses
     total = np.zeros(energy.size)
-    matrix = np.zeros((energy.size, order + 1, n_groups))
-    xs = dataset.cross_sections
-    losses = dataset.average_energy_losses
-    if "xs_exc" not in xs or "loss_exc" not in losses:
+    matrix = np.zeros((energy.size, order + 1, structure.n_groups))
+    if "xs_exc" not in cross_sections or "loss_exc" not in average_losses:
         return total, matrix
-    sigma = np.interp(
-        energy, xs["xs_exc"].energy, xs["xs_exc"].cross_section, left=0.0, right=0.0
-    )
-    loss = np.interp(
-        energy,
-        losses["loss_exc"].energy,
-        losses["loss_exc"].avg_loss,
-        left=0.0,
-        right=0.0,
-    )
+    xs = cross_sections["xs_exc"]
+    sigma = _interp_table(energy, xs.energy, xs.cross_section)
+    loss_table = average_losses["loss_exc"]
+    loss = _interp_table(energy, loss_table.energy, loss_table.avg_loss)
     catastrophic = loss > energy - cutoff_energy(energy, structure, cutoff)
     total = np.where(catastrophic, sigma, 0.0)
-    e_out = energy - loss
-    inside = (
-        catastrophic & (e_out > structure.energy[-1]) & (e_out <= structure.energy[0])
+    energy_out = energy - loss
+    lands_in_structure = (
+        catastrophic
+        & (energy_out > structure.energy[-1])
+        & (energy_out <= structure.energy[0])
     )
-    rows = np.flatnonzero(inside)
-    matrix[rows, :, _group_of(structure, e_out[rows])] = sigma[rows, None]
+    nodes = np.flatnonzero(lands_in_structure)
+    matrix[nodes, :, _group_of(structure, energy_out[nodes])] = sigma[nodes, None]
     return total, matrix
 
 
@@ -583,19 +676,20 @@ def _catastrophic_excitation(dataset, structure, cutoff, energy, order):
 def landesman_morel_correction(
     total: np.ndarray, elastic_diagonal: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Extended transport correction with momentum transfer (Eqs. 62-66)
+    """Landesman-Morel transport correction with momentum transfer
 
-    For each group, with ``S[l] = Sigma_{s,l,g->g}`` the within-group elastic
-    moments and ``L`` the last non-zero one::
+    Removes the forward-peaked part of elastic scattering from the Boltzmann
+    operator and hands it to the Fokker-Planck operator as a soft momentum
+    transfer.  For each group, with ``S[l] = Sigma_{s,l,g->g}`` the
+    within-group elastic moments and ``L`` the last non-zero one::
 
-        T_g       = (S[L-1] - S[L]) / (2 L)                          (63)
-        total'    = total - S[L] - T_g L (L + 1)                     (65)
-        S'[l]     = S[l] - S[L] - T_g (L (L + 1) - l (l + 1))        (66)
+        T_g       = (S[L-1] - S[L]) / (2 L)
+        total'    = total - S[L] - T_g L (L + 1)
+        S'[l]     = S[l] - S[L] - T_g (L (L + 1) - l (l + 1))
 
-    ``T_g`` is the soft momentum transfer handed to the Fokker-Planck
-    operator.  Groups with ``L < 1`` (isotropic) are left alone with
-    ``T_g = 0``.  A negative ``T_g`` (non-monotone moments) is set to 0,
-    which leaves the plain extended transport correction.
+    Groups with ``L < 1`` (isotropic) are left alone with ``T_g = 0``.  A
+    negative ``T_g`` (non-monotone moments) is set to 0, which leaves the plain
+    extended transport correction.
 
     Parameters
     ----------
@@ -613,30 +707,34 @@ def landesman_morel_correction(
     momentum_transfer : numpy.ndarray
         ``T_g``, shape ``(G,)``.
     """
-    n_groups, n_orders = elastic_diagonal.shape
-    total_out = total.copy()
-    diagonal = elastic_diagonal.copy()
-    momentum = np.zeros(n_groups)
-    ell = np.arange(n_orders)
-    for g in range(n_groups):
-        nonzero = np.flatnonzero(elastic_diagonal[g])
+    n_groups, n_moments = elastic_diagonal.shape
+    total_corrected = total.copy()
+    diagonal_corrected = elastic_diagonal.copy()
+    momentum_transfer = np.zeros(n_groups)
+    orders = np.arange(n_moments)
+    for group in range(n_groups):
+        moments = elastic_diagonal[group]
+        nonzero = np.flatnonzero(moments)
         if nonzero.size == 0 or nonzero[-1] < 1:
             continue
         last = int(nonzero[-1])
-        moments = elastic_diagonal[g]
-        t_g = max((moments[last - 1] - moments[last]) / (2.0 * last), 0.0)
-        total_out[g] = total[g] - moments[last] - t_g * last * (last + 1)
-        corrected = (
-            moments - moments[last] - t_g * (last * (last + 1) - ell * (ell + 1))
+        transfer = max((moments[last - 1] - moments[last]) / (2.0 * last), 0.0)
+        total_corrected[group] = (
+            total[group] - moments[last] - transfer * last * (last + 1)
         )
-        diagonal[g, : last + 1] = corrected[: last + 1]
-        momentum[g] = t_g
-    return total_out, diagonal, momentum
+        corrected = (
+            moments
+            - moments[last]
+            - transfer * (last * (last + 1) - orders * (orders + 1))
+        )
+        diagonal_corrected[group, : last + 1] = corrected[: last + 1]
+        momentum_transfer[group] = transfer
+    return total_corrected, diagonal_corrected, momentum_transfer
 
 
 @dataclass
 class BFPData:
-    """Multigroup output of :func:`generate`, ready for ``ParticleMG``
+    """Multigroup BFP data produced by :func:`generate`, ready for ``ParticleMG``
 
     Parameters
     ----------
@@ -663,11 +761,11 @@ def generate(
     cutoff: CutoffModel | str = CutoffModel.RADIANT,
     legendre_order: int = 15,
 ) -> BFPData:
-    """Multigroup Boltzmann-Fokker-Planck data for electrons from EEDL
+    """Multigroup Boltzmann-Fokker-Planck electron data from EEDL
 
-    Builds, on *structure* and with the weighting *weight* (Eqs. 4-9 of
-    Bienvenue et al., J. Comput. Phys. 524 (2025) 113740, with ``w = 1``
-    their constant-flux average):
+    Averages over each group of *structure*, weighted by the flux spectrum
+    *weight* (constant flux gives the group averages of Bienvenue et al.,
+    J. Comput. Phys. 524 (2025) 113740), and builds:
 
     * the soft stopping power and energy straggling, per group and at the
       group bounds (:func:`pointwise_stopping_power`,
@@ -675,8 +773,8 @@ def generate(
     * the catastrophic scattering matrices of elastic scattering,
       electroionization (scattered primary and knock-on), bremsstrahlung
       (deflected electron) and excitation;
-    * the total cross section and the momentum transfer after the elastic
-      Landesman-Morel correction (:func:`landesman_morel_correction`).
+    * the total cross section and the momentum transfer after the
+      Landesman-Morel transport correction (:func:`landesman_morel_correction`).
 
     The momentum transfer is the elastic one only: bremsstrahlung leaves the
     electron undeflected (``T = 0``) and the paper neglects it for ionization.
@@ -697,59 +795,79 @@ def generate(
     Returns
     -------
     BFPData
+        Soft coefficients, corrected total and momentum-transfer cross
+        sections, and the catastrophic scattering matrices.
+
+    Raises
+    ------
+    ValidationError
+        If *legendre_order* is below 1, *cutoff* is unknown, or the dataset
+        lacks the tables the channels need (see
+        :func:`pointwise_stopping_power`).
     """
     cutoff = _coerce_cutoff(cutoff)
     if legendre_order < 1:
         raise ValidationError("generate: legendre_order must be at least 1.")
-    grid = _evaluation_grid(dataset, None, "generate")
-    quadrature = group_quadrature(structure, grid)
-    nodes = quadrature.energy
+    pointwise_energies = _evaluation_grid(dataset, None, "generate")
+    quadrature = group_quadrature(structure, pointwise_energies)
+    node_energy = quadrature.energy
 
-    def average(values):
+    def group_average(values):
         return collapse_nodes(values, quadrature, weight)
 
-    # Soft stopping power and straggling: group averages (Eq. 8) and bound values (Eq. 7)
+    # Soft stopping power and straggling: averaged over each group and at the group bounds
     bounds = structure.energy
     coefficients = BFPCoefficients(
-        stopping_power=average(_soft_loss_moment(dataset, structure, cutoff, 1, nodes)),
+        stopping_power=group_average(
+            _soft_loss_moment(dataset, structure, cutoff, 1, node_energy)
+        ),
         boundary_stopping_power=_soft_loss_moment(
             dataset, structure, cutoff, 1, bounds
         ),
-        straggling=average(_soft_loss_moment(dataset, structure, cutoff, 2, nodes)),
+        straggling=group_average(
+            _soft_loss_moment(dataset, structure, cutoff, 2, node_energy)
+        ),
         boundary_straggling=_soft_loss_moment(dataset, structure, cutoff, 2, bounds),
     )
 
-    # Elastic scattering stays within each group; Sigma_t of elastic is Sigma_{s,0} (Eq. 61)
-    elastic = elastic_legendre_cross_sections(dataset, nodes, legendre_order)
-    elastic_diagonal = average(elastic)
+    # Elastic scattering stays within each group; its total is its zeroth moment.
+    elastic = elastic_legendre_cross_sections(dataset, node_energy, legendre_order)
+    elastic_diagonal = group_average(elastic)
 
     total = elastic[:, 0].copy()
-    matrices = {}
-    for label, build in (
+    catastrophic_matrices = {}
+    for label, build_catastrophic in (
         ("ionization", _catastrophic_ionization),
         ("bremsstrahlung", _catastrophic_bremsstrahlung),
-        (_EXCITATION, _catastrophic_excitation),
+        ("excitation", _catastrophic_excitation),
     ):
-        cat_total, cat_matrix = build(dataset, structure, cutoff, nodes, legendre_order)
-        total += cat_total
-        if np.any(cat_matrix):
-            # (G', L+1, G) from the averaged source group -> (L+1, G', G)
-            matrices[label] = average(cat_matrix).transpose(1, 0, 2)
+        catastrophic_total, catastrophic_matrix = build_catastrophic(
+            dataset, structure, cutoff, node_energy, legendre_order
+        )
+        total += catastrophic_total
+        if np.any(catastrophic_matrix):
+            # group-averaged over the source energy: (G_from, L+1, G_to) -> (L+1, G_from, G_to)
+            catastrophic_matrices[label] = group_average(catastrophic_matrix).transpose(
+                1, 0, 2
+            )
 
-    total_corrected, diagonal, momentum = landesman_morel_correction(
-        average(total), elastic_diagonal
+    total_corrected, diagonal_corrected, momentum_transfer = landesman_morel_correction(
+        group_average(total), elastic_diagonal
     )
     n_groups = structure.n_groups
     elastic_matrix = np.zeros((legendre_order + 1, n_groups, n_groups))
-    elastic_matrix[:, np.arange(n_groups), np.arange(n_groups)] = diagonal.T
+    elastic_matrix[:, np.arange(n_groups), np.arange(n_groups)] = diagonal_corrected.T
 
     scattering = {"elastic": ScatteringMatrix("elastic", elastic_matrix)}
-    scattering.update({k: ScatteringMatrix(k, v) for k, v in matrices.items()})
+    for label, matrix in catastrophic_matrices.items():
+        scattering[label] = ScatteringMatrix(label, matrix)
     return BFPData(
         coefficients=coefficients,
         cross_sections={
             "xs_tot": GroupXS("xs_tot", total_corrected),
-            MOMENTUM_TRANSFER_LABEL: GroupXS(MOMENTUM_TRANSFER_LABEL, momentum),
+            MOMENTUM_TRANSFER_LABEL: GroupXS(
+                MOMENTUM_TRANSFER_LABEL, momentum_transfer
+            ),
         },
         scattering=scattering,
     )

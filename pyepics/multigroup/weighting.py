@@ -8,22 +8,23 @@
 """
 Weighting spectra for group collapse
 
-A group cross section is the flux-weighted average of the pointwise one,
+A group cross section is the average of the pointwise one over the group,
+weighted by the particle flux spectrum within the group,
 
 .. math:: \\Sigma_g = \\frac{\\int_g \\Sigma(E)\\, w(E)\\, dE}{\\int_g w(E)\\, dE},
 
-so a weighting spectrum is just a function ``w(E)`` of energy in eV.  Only
-its shape matters: scaling ``w`` by a constant changes nothing.
+so a weighting spectrum is just a function ``w(E)`` of energy in eV that
+approximates the flux.  Only its shape matters: scaling ``w`` by a constant
+changes nothing.
 
 Pre-defined spectra
 -------------------
 ``uniform``
-    ``w(E) = 1``.  Constant flux in each group, which is what the RADIANT
-    paper assumes (Bienvenue et al., J. Comput. Phys. 524 (2025) 113740,
-    Eqs. 4-9).
+    ``w(E) = 1``.  Constant flux in each group, as assumed in the group
+    averages of Bienvenue et al. (J. Comput. Phys. 524 (2025) 113740).
 ``inverse_energy``
-    ``w(E) = 1/E``.  The usual slowing-down spectrum.  Singular at zero, so
-    it cannot weight a group whose lower bound is 0.
+    ``w(E) = 1/E``.  The flux of a particle slowing down in a medium.
+    Singular at zero, so it cannot weight a group whose lower bound is 0.
 
 A 1/S spectrum (inverse stopping power) is planned.
 
@@ -32,9 +33,8 @@ User-supplied spectra
 * :class:`WeightingSpectrum` wraps any function of energy, or
 * :meth:`WeightingSpectrum.from_table` builds one from a tabulated flux.
 
-This module only defines and validates spectra.  The integration is done in
-:mod:`pyepics.multigroup.collapse`, which should call :func:`resolve` on
-whatever it is given.
+This module only defines and validates spectra; the group averaging is done
+in :mod:`pyepics.multigroup.collapse`.
 """
 
 from __future__ import annotations
@@ -57,9 +57,9 @@ __all__ = [
 
 @dataclass(frozen=True)
 class WeightingSpectrum:
-    """A named weighting function ``w(E)``
+    """A named flux weighting function ``w(E)``
 
-    Calling the instance evaluates and checks the function.
+    Calling the instance evaluates the function and checks the result.
 
     Parameters
     ----------
@@ -71,8 +71,8 @@ class WeightingSpectrum:
         non-negative.
     requires_positive_energy : bool, optional
         True if ``func`` is singular at ``E = 0``.  Evaluating at
-        ``E <= 0`` then raises, and the collapse should refuse groups whose
-        lower bound is 0.
+        ``E = 0`` then raises, and the collapse refuses groups whose lower
+        bound is 0.
 
     Raises
     ------
@@ -101,23 +101,25 @@ class WeightingSpectrum:
             )
 
     def __call__(self, energy) -> np.ndarray:
-        """Evaluate ``w(E)`` at *energy* (eV), a scalar or array"""
+        """Flux weight ``w(E)`` at *energy* (eV), a scalar or array"""
         owner = f"WeightingSpectrum '{self.name}'"
-        e = np.asarray(energy, dtype="f8")
-        if not np.all(np.isfinite(e)):
+        energy = np.asarray(energy, dtype="f8")
+        if not np.all(np.isfinite(energy)):
             raise ValidationError(f"{owner}: energies must be finite.")
-        if np.any(e < 0.0) or (self.requires_positive_energy and np.any(e == 0.0)):
+        if np.any(energy < 0.0) or (
+            self.requires_positive_energy and np.any(energy == 0.0)
+        ):
             bound = "positive" if self.requires_positive_energy else "non-negative"
             raise ValidationError(f"{owner}: energies must be {bound}.")
-        w = np.asarray(self.func(e), dtype="f8")
-        if w.shape != e.shape:
+        weights = np.asarray(self.func(energy), dtype="f8")
+        if weights.shape != energy.shape:
             raise ValidationError(
-                f"{owner}: func returned shape {w.shape} for energies of "
-                f"shape {e.shape}."
+                f"{owner}: func returned shape {weights.shape} for energies of "
+                f"shape {energy.shape}."
             )
-        if not np.all(np.isfinite(w)) or np.any(w < 0.0):
+        if not np.all(np.isfinite(weights)) or np.any(weights < 0.0):
             raise ValidationError(f"{owner}: weights must be finite and non-negative.")
-        return w
+        return weights
 
     @classmethod
     def from_table(
@@ -127,7 +129,7 @@ class WeightingSpectrum:
         weight: np.ndarray,
         interpolation: str = "loglog",
     ) -> WeightingSpectrum:
-        """Build a spectrum from a tabulated flux, e.g. from an earlier run
+        """Weighting spectrum interpolated from a tabulated flux, e.g. a previous run
 
         Parameters
         ----------
@@ -161,55 +163,58 @@ class WeightingSpectrum:
                 f"(got {interpolation!r})."
             )
         try:
-            e = np.array(energy, dtype="f8")
-            w = np.array(weight, dtype="f8")
+            table_energy = np.array(energy, dtype="f8")
+            table_weight = np.array(weight, dtype="f8")
         except (TypeError, ValueError) as exc:
             raise ValidationError(f"{owner}: table must be numeric ({exc}).") from exc
-        if e.ndim != 1 or e.shape != w.shape or e.size < 2:
+        if (
+            table_energy.ndim != 1
+            or table_energy.shape != table_weight.shape
+            or table_energy.size < 2
+        ):
             raise ValidationError(
                 f"{owner}: energy and weight must be 1-D arrays of equal "
-                f"length >= 2 (got shapes {e.shape} and {w.shape})."
+                f"length >= 2 (got shapes {table_energy.shape} and "
+                f"{table_weight.shape})."
             )
-        if not (np.all(np.isfinite(e)) and np.all(np.isfinite(w))):
+        if not (
+            np.all(np.isfinite(table_energy)) and np.all(np.isfinite(table_weight))
+        ):
             raise ValidationError(f"{owner}: table contains non-finite values.")
-        if e[0] <= 0.0 or np.any(np.diff(e) <= 0.0):
+        if table_energy[0] <= 0.0 or np.any(np.diff(table_energy) <= 0.0):
             raise ValidationError(
                 f"{owner}: energies must be positive and strictly ascending."
             )
-        if np.any(w < 0.0) or (interpolation == "loglog" and np.any(w <= 0.0)):
+        if np.any(table_weight < 0.0) or (
+            interpolation == "loglog" and np.any(table_weight <= 0.0)
+        ):
             raise ValidationError(
                 f"{owner}: weights must be "
                 f"{'positive' if interpolation == 'loglog' else 'non-negative'} "
                 f"for {interpolation} interpolation."
             )
-        e.setflags(write=False)
-        w.setflags(write=False)
-        lo, hi = float(e[0]), float(e[-1])
+        table_energy.setflags(write=False)
+        table_weight.setflags(write=False)
+        lowest, highest = float(table_energy[0]), float(table_energy[-1])
 
-        def tabulated(x: np.ndarray) -> np.ndarray:
-            if np.any(x < lo) or np.any(x > hi):
+        def tabulated(energy: np.ndarray) -> np.ndarray:
+            if np.any(energy < lowest) or np.any(energy > highest):
                 raise ValidationError(
                     f"{owner}: energies outside the table range "
-                    f"[{lo:.6e}, {hi:.6e}] eV."
+                    f"[{lowest:.6e}, {highest:.6e}] eV."
                 )
             if interpolation == "linear":
-                return np.interp(x, e, w)
-            return np.exp(np.interp(np.log(x), np.log(e), np.log(w)))
+                return np.interp(energy, table_energy, table_weight)
+            return np.exp(
+                np.interp(np.log(energy), np.log(table_energy), np.log(table_weight))
+            )
 
         return cls(name, tabulated, requires_positive_energy=interpolation == "loglog")
 
 
-def _uniform(energy: np.ndarray) -> np.ndarray:
-    return np.ones_like(energy)
-
-
-def _inverse_energy(energy: np.ndarray) -> np.ndarray:
-    return 1.0 / energy
-
-
-uniform = WeightingSpectrum("uniform", _uniform)
+uniform = WeightingSpectrum("uniform", np.ones_like)
 inverse_energy = WeightingSpectrum(
-    "inverse_energy", _inverse_energy, requires_positive_energy=True
+    "inverse_energy", np.reciprocal, requires_positive_energy=True
 )
 
 #: Pre-defined spectra by name, for APIs and the command line.
@@ -219,13 +224,17 @@ PREDEFINED: dict[str, WeightingSpectrum] = {
 
 
 def resolve(weight: WeightingSpectrum | str | Callable) -> WeightingSpectrum:
-    """Turn whatever the caller passed into a :class:`WeightingSpectrum`
+    """Weighting spectrum for a spectrum object, a pre-defined name or a function
 
     Parameters
     ----------
     weight : WeightingSpectrum | str | callable
         A spectrum (returned as is), the name of a pre-defined one, or a
         plain function of energy, which is wrapped using its ``__name__``.
+
+    Returns
+    -------
+    WeightingSpectrum
 
     Raises
     ------

@@ -8,9 +8,9 @@
 """
 Typed dataclass models for collapsed EPICS datasets
 
-Every model is a frozen-safe ``dataclass`` carrying scalar metadata and
-NumPy arrays.  Models are the sole output of the physics/collapse layers and
-the sole input of the converter layer, enforcing strict separation of concerns.
+Every model is a ``dataclass`` carrying scalar metadata and NumPy arrays,
+validated on construction.  The models hold the output of the group collapse
+and are the only input the writers need.
 
 Hierarchy
 ---------
@@ -102,18 +102,18 @@ from pyepics.utils.validation import (
 def _float_array(owner: str, name: str, values: np.ndarray, ndim: int) -> np.ndarray:
     """Copy *values* to a finite ``float64`` array of the given dimension"""
     try:
-        arr = np.array(values, dtype="f8")  # copy
+        array = np.array(values, dtype="f8")  # copy
     except (TypeError, ValueError) as exc:
         raise ValidationError(f"{owner}: {name} must be numeric ({exc}).") from exc
-    if arr.ndim != ndim:
+    if array.ndim != ndim:
         raise ValidationError(
-            f"{owner}: {name} must be a {ndim}D array (got {arr.ndim}D)."
+            f"{owner}: {name} must be a {ndim}D array (got {array.ndim}D)."
         )
-    if arr.size == 0:
+    if array.size == 0:
         raise ValidationError(f"{owner}: {name} must not be empty.")
-    if not np.all(np.isfinite(arr)):
+    if not np.all(np.isfinite(array)):
         raise ValidationError(f"{owner}: {name} contains non-finite values.")
-    return arr
+    return array
 
 
 @dataclass(frozen=True, eq=False)
@@ -195,9 +195,9 @@ class GroupStructure:
                 f"'{self.label}' [{self.energy[-1]:.6e}, {self.energy[0]:.6e}]."
             )
         # np.searchsorted needs ascending input; reverse the view.
-        k = int(np.searchsorted(self.energy[::-1], energy, side="left"))
-        g = self.energy.size - 1 - k
-        return min(max(g, 0), self.n_groups - 1)
+        n_bounds_below = int(np.searchsorted(self.energy[::-1], energy, side="left"))
+        group = self.energy.size - 1 - n_bounds_below
+        return min(max(group, 0), self.n_groups - 1)
 
 
 @dataclass
@@ -327,8 +327,8 @@ class BFPCoefficients:
     ValidationError
         If an array is not a non-empty 1-D finite array, contains negative
         values, or has the wrong length (``G`` for group values, ``G+1``
-        for boundary values, with ``G`` taken from *stopping_power*); if
-        or exactly one of *straggling* and *boundary_straggling* is given.
+        for boundary values, with ``G`` taken from *stopping_power*); or if
+        exactly one of *straggling* and *boundary_straggling* is given.
     """
 
     stopping_power: np.ndarray
@@ -346,11 +346,11 @@ class BFPCoefficients:
         )
         validate_non_negative(self.stopping_power, "stopping_power")
         validate_non_negative(self.boundary_stopping_power, "boundary_stopping_power")
-        n = self.stopping_power.size
-        if self.boundary_stopping_power.size != n + 1:
+        n_groups = self.stopping_power.size
+        if self.boundary_stopping_power.size != n_groups + 1:
             raise ValidationError(
-                f"{owner}: stopping_power has {n} groups, so "
-                f"boundary_stopping_power must have {n + 1} values "
+                f"{owner}: stopping_power has {n_groups} groups, so "
+                f"boundary_stopping_power must have {n_groups + 1} values "
                 f"(got {self.boundary_stopping_power.size})."
             )
 
@@ -371,15 +371,15 @@ class BFPCoefficients:
             )
             validate_non_negative(self.straggling, "straggling")
             validate_non_negative(self.boundary_straggling, "boundary_straggling")
-            if self.straggling.size != n:
+            if self.straggling.size != n_groups:
                 raise ValidationError(
-                    f"{owner}: stopping_power has {n} groups but straggling "
+                    f"{owner}: stopping_power has {n_groups} groups but straggling "
                     f"has {self.straggling.size}."
                 )
-            if self.boundary_straggling.size != n + 1:
+            if self.boundary_straggling.size != n_groups + 1:
                 raise ValidationError(
-                    f"{owner}: stopping_power has {n} groups, so "
-                    f"boundary_straggling must have {n + 1} values "
+                    f"{owner}: stopping_power has {n_groups} groups, so "
+                    f"boundary_straggling must have {n_groups + 1} values "
                     f"(got {self.boundary_straggling.size})."
                 )
 
@@ -414,13 +414,14 @@ class TransportModel(StrEnum):
     and scattering cross sections using the highest Legendre moment.
 
     Reference: Bienvenue, Naceur, Hebert, Carrier, J. Comput. Phys. 524
-    (2025) 113740, Sec. 4.3, Eqs. (62)-(66).  All quantities are the
-    *within-group* (``g -> g``) elastic moments of each group ``g``.  With
-    ``L`` the last non-zero Legendre moment::
+    (2025) 113740, the extended transport correction with momentum transfer
+    (Landesman-Morel).  All quantities are the *within-group* (``g -> g``)
+    elastic moments of each group ``g``.  With ``L`` the last non-zero
+    Legendre moment::
 
-        T_g          = (S[L-1] - S[L]) / (2 L)                 (63)
-        sigma_t'     = sigma_t - S[L] - T_g L (L + 1)          (65)
-        S'[l]        = S[l]    - S[L] - T_g (L (L + 1) - l (l + 1))   (66)
+        T_g          = (S[L-1] - S[L]) / (2 L)
+        sigma_t'     = sigma_t - S[L] - T_g L (L + 1)
+        S'[l]        = S[l]    - S[L] - T_g (L (L + 1) - l (l + 1))
 
     where ``S[l]`` is ``Sigma_{s,l,g->g}``.  ``S'[0]`` equals ``sigma_t'``
     and ``S'[L]`` is zero.
@@ -428,7 +429,7 @@ class TransportModel(StrEnum):
     * ``bfp`` -- Landesman-Morel (all terms).  ``T_g`` is the elastic
       momentum transfer passed to the Fokker-Planck operator, so it comes
       from the matrix moments, not from integrating the DCS, and depends on
-      ``L`` (and on the paper's Eq. (60) zeroing of unstable high orders).
+      ``L`` (and on the paper's zeroing of unstable high-order moments).
     * ``bcsd`` -- no Fokker-Planck operator, so nothing takes up the soft
       part.  The ``T_g`` terms must **not** be applied: they would delete the
       angular deflection of soft elastic scattering from the problem.  The
@@ -440,8 +441,9 @@ class TransportModel(StrEnum):
 
     .. note::
        The paper does not treat ``bcsd``.  Using the ``T_g = 0`` limit
-       there is derived from Eqs. (65)-(66), and rests on the higher moments
-       being close to ``S[L]`` (forward-peaked scattering).  Benchmark it
+       there is derived from the corrected total and scattering cross
+       sections above, and rests on the higher moments being close to
+       ``S[L]`` (forward-peaked scattering).  Benchmark it
        against ``bfp`` before relying on it.
     """
 
@@ -590,7 +592,7 @@ class ParticleMG:
         )
         if not isinstance(self.group_structure, GroupStructure):
             raise ValidationError(f"{owner}: group_structure must be a GroupStructure.")
-        n = self.group_structure.n_groups
+        n_groups = self.group_structure.n_groups
 
         if self.particle is Particle.PHOTON and (
             self.transport_model is not TransportModel.BOLTZMANN
@@ -618,19 +620,19 @@ class ParticleMG:
             )
 
         self.cross_sections = self._check_leaves(
-            "cross_sections", self.cross_sections, GroupXS, n
+            "cross_sections", self.cross_sections, GroupXS, n_groups
         )
         self.scattering = self._check_leaves(
-            "scattering", self.scattering, ScatteringMatrix, n
+            "scattering", self.scattering, ScatteringMatrix, n_groups
         )
 
         if self.coefficients is not None:
             if not isinstance(self.coefficients, BFPCoefficients):
                 raise ValidationError(f"{owner}: coefficients must be BFPCoefficients.")
-            if self.coefficients.n_groups != n:
+            if self.coefficients.n_groups != n_groups:
                 raise ValidationError(
                     f"{owner}: coefficients have {self.coefficients.n_groups} "
-                    f"groups but group_structure has {n}."
+                    f"groups but group_structure has {n_groups}."
                 )
         if self.cutoff is not None and (
             not isinstance(self.cutoff, str) or not self.cutoff.strip()
@@ -661,10 +663,10 @@ class ParticleMG:
 
     def _check_model_fields(self) -> None:
         rules = _MODEL_RULES[self.transport_model]
-        coeffs = self.coefficients
+        coefficients = self.coefficients
         present = dict(
-            coefficients=coeffs is not None,
-            straggling=coeffs is not None and coeffs.has_straggling,
+            coefficients=coefficients is not None,
+            straggling=coefficients is not None and coefficients.has_straggling,
             momentum_transfer=MOMENTUM_TRANSFER_LABEL in self.cross_sections,
             scattering=bool(self.scattering),
             cutoff=self.cutoff is not None,
@@ -747,30 +749,32 @@ class MGElement:
                 f"({expected!r})."
             )
         try:
-            awr = float(self.atomic_weight_ratio)
+            ratio = float(self.atomic_weight_ratio)
         except (TypeError, ValueError):
             raise ValidationError(
                 f"{owner}: atomic_weight_ratio must be a number "
                 f"(got {self.atomic_weight_ratio!r})."
             ) from None
-        if not (np.isfinite(awr) and awr > 0.0):
+        if not (np.isfinite(ratio) and ratio > 0.0):
             raise ValidationError(
                 f"{owner}: atomic_weight_ratio must be finite and positive "
-                f"(got {awr})."
+                f"(got {ratio})."
             )
-        self.atomic_weight_ratio = awr
+        self.atomic_weight_ratio = ratio
 
         for slot, particle in (
             ("electron", Particle.ELECTRON),
             ("photon", Particle.PHOTON),
         ):
-            pmg = getattr(self, slot)
-            if pmg is None:
+            particle_data = getattr(self, slot)
+            if particle_data is None:
                 continue
-            if not isinstance(pmg, ParticleMG):
+            if not isinstance(particle_data, ParticleMG):
                 raise ValidationError(f"{owner}: {slot} must be a ParticleMG.")
-            if pmg.particle is not particle:
-                raise ValidationError(f"{owner}: {slot} holds {pmg.particle} data.")
+            if particle_data.particle is not particle:
+                raise ValidationError(
+                    f"{owner}: {slot} holds {particle_data.particle} data."
+                )
         if self.electron is None and self.photon is None:
             raise ValidationError(
                 f"{owner} {self.symbol}: needs electron and/or photon data."
@@ -836,41 +840,41 @@ class MGLibrary:
 
     def _check_consistent(self, owner: str) -> None:
         for particle in Particle:
-            ref_element = None
-            for z in sorted(self.elements):
-                element = self.elements[z]
-                pmg = element.particles.get(particle)
-                if pmg is None:
+            reference = None
+            for atomic_number in sorted(self.elements):
+                element = self.elements[atomic_number]
+                data = element.particles.get(particle)
+                if data is None:
                     continue
-                if ref_element is None:
-                    ref_element, ref = element, pmg
+                if reference is None:
+                    reference_element, reference = element, data
                     continue
-                for name, same in (
-                    (
-                        "group_structure",
-                        np.array_equal(
-                            pmg.group_structure.energy, ref.group_structure.energy
-                        ),
+                agreement = {
+                    "group_structure": np.array_equal(
+                        data.group_structure.energy, reference.group_structure.energy
                     ),
-                    ("transport_model", pmg.transport_model == ref.transport_model),
-                    (
-                        "transport_correction",
-                        pmg.transport_correction == ref.transport_correction,
+                    "transport_model": data.transport_model
+                    == reference.transport_model,
+                    "transport_correction": (
+                        data.transport_correction == reference.transport_correction
                     ),
-                    ("cutoff", pmg.cutoff == ref.cutoff),
-                ):
-                    if not same:
+                    "cutoff": data.cutoff == reference.cutoff,
+                }
+                for name, agrees in agreement.items():
+                    if not agrees:
                         raise ValidationError(
                             f"{owner}: {particle} {name} of {element.symbol} "
-                            f"(Z={element.Z}) differs from {ref_element.symbol} "
-                            f"(Z={ref_element.Z})."
+                            f"(Z={element.Z}) differs from {reference_element.symbol} "
+                            f"(Z={reference_element.Z})."
                         )
 
     @property
     def particles(self) -> list[Particle]:
         """Particles present in at least one element, electron first"""
         return [
-            p for p in Particle if any(p in e.particles for e in self.elements.values())
+            particle
+            for particle in Particle
+            if any(particle in element.particles for element in self.elements.values())
         ]
 
     def group_structure(self, particle: Particle | str) -> GroupStructure:
@@ -882,19 +886,19 @@ class MGLibrary:
             If *particle* is invalid or no element has data for it.
         """
         particle = _coerce_enum("MGLibrary", Particle, particle, "particle")
-        for z in sorted(self.elements):
-            pmg = self.elements[z].particles.get(particle)
-            if pmg is not None:
-                return pmg.group_structure
+        for atomic_number in sorted(self.elements):
+            particle_data = self.elements[atomic_number].particles.get(particle)
+            if particle_data is not None:
+                return particle_data.group_structure
         raise ValidationError(
             f"MGLibrary '{self.label}': no element has {particle} data."
         )
 
-    def __getitem__(self, z: int) -> MGElement:
-        return self.elements[z]
+    def __getitem__(self, atomic_number: int) -> MGElement:
+        return self.elements[atomic_number]
 
-    def __contains__(self, z: object) -> bool:
-        return z in self.elements
+    def __contains__(self, atomic_number: object) -> bool:
+        return atomic_number in self.elements
 
     def __len__(self) -> int:
         return len(self.elements)
